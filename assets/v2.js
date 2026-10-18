@@ -334,18 +334,6 @@
     var page = $s('#page');
     var prov = V2X.province;
     page.innerHTML =
-      '<div class="v2-story">' +
-        '<div class="v2-story-txt"><div class="lab">核心结论</div>' +
-          '<div class="txt" id="st-concl">2015→2019，山西流感样病例的年内峰值扩大了 ' + fmt(prov.peakRatio, 1) + ' 倍；' + prov.peakDate + ' 达到 ' + fmt(prov.peakValue, 1) + ' 例。</div>' +
-        '</div>' +
-        '<div class="v2-story-kpis" id="st-kpis">' +
-          kpi('2019 峰值', fmt(prov.peakValue, 1) + ' 例', prov.peakDate) +
-          kpi('较 2015 峰值', '×' + fmt(prov.peakRatio, 1), '2015 峰值 ' + fmt(V2X.province.yearPeak['2015'].value, 1) + ' 例') +
-          kpi('当前全省', '—', '7 日平滑合计') +
-          kpi('7 日变化', '—', '较 7 天前') +
-        '</div>' +
-        '<canvas id="st-curve" width="360" height="56"></canvas>' +
-      '</div>' +
       '<div class="ov-grid">' +
         '<div>' +
           '<div class="panel">' +
@@ -381,7 +369,7 @@
               '<div class="v2-kpi"><div class="k">持续性基线</div><div class="v">2.1225</div><div class="s">零参数参照</div></div>' +
               '<div class="v2-kpi"><div class="k">总体 PCC</div><div class="v">0.8143</div><div class="s">15 种子集成</div></div>' +
             '</div>' +
-            '<div class="small muted" style="margin-top:8px">预测扇形与逐城误差在city页；机理数据（β/C）在 mech_data 中，后续接模型页。</div>' +
+            '<div class="small muted" style="margin-top:8px">预测扇形与逐城误差在 city 页 · <a href="explain.html" style="color:#f4b942">看完整「数据 → 公式 → 学习」讲解动画 →</a></div>' +
           '</div>' +
           '<div class="panel" style="margin-top:16px"><h2>天气动画图例</h2><div id="ov-anim-legend"></div></div>' +
         '</div>' +
