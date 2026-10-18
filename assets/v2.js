@@ -243,6 +243,20 @@
     }
   }
 
+  /* ---------- 3D 时空立方体（iframe 嵌入，父页时间轴驱动） ---------- */
+  window.addEventListener('message', function (e) {
+    var d = e.data || {};
+    if (d && d.type === 'cubeReady' && state.view === '3d') sendCubeDay(true);
+  });
+  function sendCubeDay(force) {
+    if (state.view !== '3d' || !refs.cubeFrame) return;
+    var d = state.playing ? V2.displayIdx : state.idx;
+    var key = Math.round(d * 4) / 4;
+    if (!force && V2.cubeDay === key) return;
+    V2.cubeDay = key;
+    try { refs.cubeFrame.contentWindow.postMessage({ type: 'setDay', day: d }, '*'); } catch (e) {}
+  }
+
   /* ---------- 传播粒子 ---------- */
   function growthCache() {
     if (!V2.growthCacheDay) V2.growthCacheDay = -1;
@@ -336,10 +350,13 @@
         '<div>' +
           '<div class="panel">' +
             '<h2>山西省全景 <span class="sub" id="ov-sub"></span></h2>' +
-            '<div class="tools" id="ov-tools">' + modeButtons2() + viewButtons2() +
-              '<label class="small muted" style="display:flex;align-items:center;gap:6px;margin-left:6px"><input type="checkbox" id="ov-edges"' + (state.edges ? ' checked' : '') + '/> 接壤边</label>' +
-              '<label class="small muted" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="ov-flows"' + (state.flows ? ' checked' : '') + '/> 传播粒子</label>' +
-            '</div>' +
+            '<div class="tools" id="ov-tools">' +
+              (state.view === '3d'
+                ? viewButtons2() + '<span class="small muted" style="margin-left:8px">时空立方体：y 轴=时间 · 管径=病例 · 管色=增长率</span>'
+                : modeButtons2() + viewButtons2() +
+                  '<label class="small muted" style="display:flex;align-items:center;gap:6px;margin-left:6px"><input type="checkbox" id="ov-edges"' + (state.edges ? ' checked' : '') + '/> 接壤边</label>' +
+                  '<label class="small muted" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="ov-flows"' + (state.flows ? ' checked' : '') + '/> 传播粒子</label>')
+            + '</div>' +
             '<div class="map-wrap" id="map-wrap"></div>' +
             '<div class="legend" id="ov-legend">' + legendHTML(state.mode) + '</div>' +
             '<div class="anim-note"><span id="ov-note"></span><span>圆环脉冲 = 7 日变化（红升蓝降）· 粒子方向 = 数据滞后相关（非因果）</span></div>' +
@@ -390,9 +407,28 @@
     lg += '</div>';
     $s('#ov-anim-legend').innerHTML = lg;
     // 地图/网络/3D
-    if (state.view === 'map') buildMap();
-    else if (state.view === 'network') buildNetwork();
-    else if (typeof build3D === 'function') build3D();
+    if (state.view === 'map') {
+      buildMap();
+    } else if (state.view === 'network') {
+      buildNetwork();
+    } else {
+      var wrap3 = refs.mapWrap;
+      wrap3.innerHTML = '';
+      var fr = document.createElement('iframe');
+      fr.id = 'cube-frame';
+      fr.src = 'design/proto3d_v2.html?embed=1';
+      fr.style.cssText = 'display:block;width:100%;height:560px;border:0;border-radius:12px;background:#050a12;';
+      fr.addEventListener('load', function () {
+        V2.cubeDay = null; sendCubeDay(true);
+        setTimeout(function () { sendCubeDay(true); }, 400);
+        setTimeout(function () { sendCubeDay(true); }, 1200);
+        setTimeout(function () { sendCubeDay(true); }, 2600);
+      });
+      wrap3.appendChild(fr);
+      refs.cubeFrame = fr;
+      if (refs.legend) refs.legend.innerHTML = '<span class="v2-ramp div"></span><span class="small muted">管径 = 7 日平滑病例；管色 = 14 日增长率（蓝=下降 → 红=上升）</span>';
+      sendCubeDay(true);
+    }
     buildStoryBase();
     buildStripBase();
     buildStripRows();
@@ -420,7 +456,7 @@
         refs.nodes[c.name].dot.setAttribute('fill', colorFor(state.mode, modeVal(state.mode, c.name, state.idx)));
       });
     }
-    if (refs.sub) refs.sub.textContent = dateAt(state.idx) + ' ' + dowName(state.idx) + ' · ' + (MODES2.filter(function (m) { return m.id === state.mode; })[0] || {}).name;
+    if (refs.sub) refs.sub.textContent = dateAt(state.idx) + ' ' + dowName(state.idx) + (state.view === '3d' ? ' · 时空立方体' : ' · ' + ((MODES2.filter(function (m) { return m.id === state.mode; })[0] || {}).name || ''));
     // KPI
     var total = provSum(state.idx);
     var prev = provSum(Math.max(0, state.idx - 7));
@@ -437,13 +473,14 @@
     drawStory(0);
     drawStrip(0);
     updateStripRows();
+    sendCubeDay(false);
     // 顶部提示
     if (refs.note) {
       var maxP = { v: -1, c: '' };
       DATA.meta.cities.forEach(function (c) { var p = gv(c.name, 'precip', state.idx) || 0; if (p > maxP.v) { maxP.v = p; maxP.c = c.name; } });
       var lv = rainLevel(maxP.v);
       if (state.view === '3d') {
-        refs.note.innerHTML = '旧版 3D（柱高 = 指标）· <a href="design/proto3d_v2.html" target="_blank" style="color:#f4b942">预览新版时空立方体 →</a>';
+        refs.note.innerHTML = '时空立方体：y 轴 = 时间（2015→2019）· 拖动旋转 · 滚轮缩放 · 时间由上方时间轴/播放控制';
       } else {
         refs.note.textContent = '当日最大降水：' + (maxP.v > 0.1 ? maxP.c + ' ' + fmt(maxP.v, 1) + ' mm（' + RAIN_LEVELS[lv].name + '）' : '全省无降水');
       }
@@ -491,6 +528,7 @@
     } else if (state.idx !== V2.lastFullIdx) {
       V2.lastFullIdx = state.idx; updateFull();
     }
+    if (state.view === '3d') sendCubeDay(false);
     if (state.weather !== false) drawMapWeather(ts);
     drawFlows(ts);
     drawCityWeather(ts);
