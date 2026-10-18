@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<title>WMEG-Net · 传播剧场（方向原型）</title>
+<style>
+  :root{--bg:#070d16;--panel:#0d1724;--line:#1d3049;--txt:#e6eef8;--muted:#8ba2bd;--up:#ff5f6d;--down:#4cc9f0;--acc:#f4b942}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--txt);font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+  #wrap{max-width:1400px;margin:0 auto;padding:14px 16px 30px}
+  .hdr{display:flex;align-items:baseline;gap:14px;justify-content:space-between;flex-wrap:wrap}
+  .hdr h1{font-size:20px;margin:0;letter-spacing:.5px}
+  .hdr .sub{color:var(--muted);font-size:12px}
+  .story{display:flex;gap:22px;align-items:center;margin:10px 0 12px;padding:10px 16px;background:linear-gradient(90deg,#0e1c2c,#0a1420);border:1px solid var(--line);border-radius:12px;flex-wrap:wrap}
+  .story .big{font-size:26px;font-weight:700;color:var(--acc)}
+  .story .lab{color:var(--muted);font-size:11px;margin-bottom:2px}
+  .story .item{min-width:110px}
+  .story .concl{font-size:14px;max-width:520px;line-height:1.5}
+  canvas{display:block;border-radius:14px;border:1px solid var(--line);background:#0a1420}
+  #cv{width:100%}
+  .bar{display:flex;gap:12px;align-items:center;margin-top:10px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;position:sticky;bottom:10px;backdrop-filter:blur(8px)}
+  .bar input[type=range]{flex:1;min-width:240px;accent-color:var(--up)}
+  .bar button{background:#16304a;border:1px solid #2e4d70;color:var(--txt);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px}
+  .bar button:hover{background:#1d3f5f}
+  .bar .date{font-size:18px;font-weight:700;min-width:120px}
+  .bar label{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center}
+  .hint{color:var(--muted);font-size:12px;margin-top:8px;line-height:1.6}
+  .hint b{color:var(--txt)}
+  #tip{position:fixed;pointer-events:none;background:rgba(6,12,20,.95);border:1px solid #2e4d70;border-radius:8px;padding:7px 10px;font-size:12px;opacity:0;z-index:9;line-height:1.5}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="hdr">
+    <h1>传播剧场 <span class="sub">（改版方向原型 v0）</span></h1>
+    <div class="sub">数据：11 市逐日病例 + 模型学到的动态传播矩阵 C + 接壤滞后相关</div>
+  </div>
+
+  <div class="story">
+    <div class="item"><div class="lab">当前日期</div><div class="big" id="s-date">2019-01-15</div></div>
+    <div class="item"><div class="lab">全省平滑病例</div><div class="big" id="s-total">—</div></div>
+    <div class="item"><div class="lab">7 日变化</div><div class="big" id="s-delta">—</div></div>
+    <div class="item"><div class="lab">全省峰值</div><div class="big" id="s-peak">—</div></div>
+    <div class="concl" id="s-concl">拖动或用播放键看 2015→2019：病例不是均匀铺开，而是沿接壤网络一波一波传。</div>
+  </div>
+
+  <canvas id="cv" width="1340" height="860"></canvas>
+  <div class="bar">
+    <button id="play">▶ 播放</button>
+    <span class="date" id="date">2019-01-15</span>
+    <input type="range" id="range" min="0" max="1825" value="1461"/>
+    <label><input type="checkbox" id="flow" checked/> 城际传播粒子</label>
+    <label>速度
+      <select id="speed">
+        <option value="10">10 天/秒</option>
+        <option value="30" selected>30 天/秒</option>
+        <option value="80">80 天/秒</option>
+      </select>
+    </label>
+    <button id="peak">跳到峰值</button>
+  </div>
+
+  <div class="hint">
+    <b>这一版想说明什么：</b>①城市圆点的大小＝当前病例水平，<b>外圈脉冲＝7 日变化速度</b>（红=上升、蓝=下降），所以"变化"第一次变成可看的运动；②19 条接壤边的底纹＝模型注意权重的准静态结构（C 的时间波动&lt;0.4%，本质是度归一化邻接，不能当实时流量）；光点＝数据滞后相关给出的方向（仅视觉引导，非因果）；③底部是 11 城 × 5 年时间带，竖线就是当前日期，**同一屏能看出谁先到峰、谁后到峰**；④顶部讲故事而不是摆面板。
+  </div>
+</div>
+<div id="tip"></div>
+
+<script>
+(function(){
+  'use strict';
+  var W = 1340, H = 860;
+  var STRIP_TOP = 590, STRIP_H = 220;
+  var app = null, mech = null, geo = null;
+  var cities = [], dates = [], N = 0;
+  var series = {};          // name -> arrays
+  var flowPairs = [], flowDaily = [], lead = {}, pairMean = [];
+  var geoPaths = {}, centroids = {}, latOrder = [];
+  var canvas = document.getElementById('cv');
+  var ctx = canvas.getContext('2d');
+  var hint = document.getElementById('tip');
+  var state = { day: 1461, playing: false, speed: 30, showFlow: true, hover: null };
+  var off = document.createElement('canvas');
+  var offCtx = off.getContext('2d');
+
+  function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+  function fmt(v,d){ return (v===null||v===undefined||isNaN(v))?'—':Number(v).toFixed(d===undefined?1:d); }
+
+  var MAP = (function(){
+    var minLon = 110.2296, maxLon = 114.5689, minLat = 34.5835, maxLat = 40.7399;
+    var lonSpan = maxLon - minLon, latSpan = maxLat - minLat;
+    var availW = W - 160, availH = (STRIP_TOP - 70) - 140;
+    var scale = Math.min(availW / lonSpan, availH / latSpan);
+    return { minLon: minLon, maxLat: maxLat, latSpan: latSpan, scale: scale,
+             ox: (W - lonSpan * scale) / 2, oy: 140 + (availH - latSpan * scale) / 2 };
+  })();
+  function project(lon, lat){
+    return [MAP.ox + (lon - MAP.minLon) * MAP.scale,
+            MAP.oy + (MAP.maxLat - lat) * MAP.scale];
+  }
+  function colorRamp(t){
+    var stops = [[20,40,80],[20,72,130],[18,120,150],[40,170,150],[150,190,60],[230,160,40],[220,60,60]];
+    var p = clamp(t,0,1) * (stops.length - 1), i = Math.min(stops.length-2, Math.floor(p)), u = p - i;
+    var a = stops[i], b = stops[i+1];
+    return 'rgb(' + Math.round(a[0]+(b[0]-a[0])*u) + ',' + Math.round(a[1]+(b[1]-a[1])*u) + ',' + Math.round(a[2]+(b[2]-a[2])*u) + ')';
+  }
+  function cases(name, d){ return series[name].casesSmooth[d]; }
+  function growth(name, d){
+    var a = cases(name, d), b = cases(name, Math.max(0, d - 7));
+    if (a === null || b === null) return 0;
+    return a - b;
+  }
+  function totalAt(d){
+    var s = 0; for (var i=0;i<cities.length;i++) s += (cases(cities[i], d) || 0); return s;
+  }
+  function q(arr, p){
+    var v = arr.filter(function(x){ return x !== null && !isNaN(x); }).slice().sort(function(a,b){return a-b;});
+    return v.length ? v[Math.floor(p*(v.length-1))] : 1;
+  }
+
+  function boot(){
+    Promise.all([
+      fetch('../data/app_data.json').then(function(r){ return r.json(); }),
+      fetch('../data/mech_data.json').then(function(r){ return r.json(); }),
+      fetch('../data/geo.json').then(function(r){ return r.json(); })
+    ]).then(function(arr){
+      app = arr[0]; mech = arr[1]; geo = arr[2];
+      dates = app.meta.dates; N = dates.length;
+      cities = app.meta.cities.map(function(c){ return c.name; });
+      cities.forEach(function(n){ series[n] = app.series[n]; });
+      flowPairs = mech.flowPairs; flowDaily = mech.flowDaily;
+      pairMean = flowPairs.map(function(_, pi){
+        var s = 0, c = 0;
+        for (var d=0; d<flowDaily.length; d++){ var v = flowDaily[d][pi]; if (v !== null && v !== undefined){ s += v; c++; } }
+        return c ? s / c : 0.22;
+      });
+      (mech.leadLag || []).forEach(function(x){
+        lead[x.i + '|' + x.j] = x.lag; lead[x.j + '|' + x.i] = -x.lag;
+      });
+      // geo paths
+      geo.features.forEach(function(f){
+        var name = f.properties.name;
+        var polys = f.geometry.type === 'MultiPolygon' ? f.geometry.coordinates : [f.geometry.coordinates];
+        var path = new Path2D();
+        polys.forEach(function(poly){
+          poly.forEach(function(ring){
+            for (var i=0;i<ring.length;i++){
+              var p = project(ring[i][0], ring[i][1]);
+              if (i===0) path.moveTo(p[0],p[1]); else path.lineTo(p[0],p[1]);
+            }
+            path.closePath();
+          });
+        });
+        geoPaths[name] = path;
+      });
+      app.meta.cities.forEach(function(c){ centroids[c.name] = project(c.lon, c.lat); });
+      latOrder = cities.slice().sort(function(a,b){
+        return app.meta.cities.find(function(z){return z.name===b;}).lat -
+               app.meta.cities.find(function(z){return z.name===a;}).lat;
+      });
+      initStrip();
+      buildStripImage();
+      // peak day of province total
+      var best = 0, bestDay = 0;
+      for (var d=0; d<N; d++){ var t = totalAt(d); if (t > best){ best = t; bestDay = d; } }
+      window.PEAK = { day: bestDay, val: best };
+      document.getElementById('s-peak').textContent = fmt(best, 0) + ' 例';
+      document.getElementById('range').max = N - 1;
+      bind();
+      requestAnimationFrame(loop);
+    }).catch(function(e){
+      document.body.innerHTML = '<pre style="color:#f88;padding:20px">数据加载失败：' + e + '</pre>';
+    });
+  }
+
+  function initStrip(){
+    off.width = N; off.height = cities.length;
+    buildStripImage();
+  }
+  function buildStripImage(){
+    var img = offCtx.createImageData(N, cities.length);
+    var perCityQ = {};
+    cities.forEach(function(n){
+      var arr = series[n].casesSmooth;
+      perCityQ[n] = q(arr, 0.98) || 1;
+    });
+    for (var row=0; row<cities.length; row++){
+      var n = latOrder[row];
+      for (var d=0; d<N; d++){
+        var v = cases(n, d);
+        var t = v === null ? 0 : Math.sqrt(v / perCityQ[n]);
+        var col = colorRamp(t);
+        var m = /rgb\((\d+),(\d+),(\d+)\)/.exec(col);
+        var idx = (row * N + d) * 4;
+        img.data[idx] = +m[1]; img.data[idx+1] = +m[2]; img.data[idx+2] = +m[3]; img.data[idx+3] = 255;
+      }
+    }
+    offCtx.putImageData(img, 0, 0);
+  }
+
+  function bind(){
+    var range = document.getElementById('range');
+    range.value = state.day;
+    range.addEventListener('input', function(){ state.day = +this.value; syncText(); });
+    document.getElementById('play').addEventListener('click', function(){
+      state.playing = !state.playing;
+      this.textContent = state.playing ? '❚❚ 暂停' : '▶ 播放';
+    });
+    document.getElementById('speed').addEventListener('change', function(){ state.speed = +this.value; });
+    document.getElementById('flow').addEventListener('change', function(){ state.showFlow = this.checked; });
+    document.getElementById('peak').addEventListener('click', function(){
+      state.day = window.PEAK.day; range.value = state.day; syncText();
+    });
+    canvas.addEventListener('mousemove', function(ev){
+      var r = canvas.getBoundingClientRect();
+      var x = (ev.clientX - r.left) / r.width * W, y = (ev.clientY - r.top) / r.height * H;
+      var found = null;
+      cities.forEach(function(n){
+        var c = centroids[n];
+        if (Math.hypot(c[0]-x, c[1]-y) < 30) found = n;
+      });
+      state.hover = found;
+      if (found){
+        var d = state.day;
+        hint.innerHTML = '<b>' + found + '</b><br/>病例（平滑） ' + fmt(cases(found, d), 1) + '<br/>7 日变化 ' + (growth(found,d)>=0?'+':'') + fmt(growth(found,d),1) + '<br/>降水 ' + fmt(series[found].precip[d], 1) + ' mm · 气温 ' + fmt(series[found].tavg[d], 1) + ' °C';
+        hint.style.opacity = 1;
+        hint.style.left = (ev.clientX + 16) + 'px';
+        hint.style.top = (ev.clientY + 12) + 'px';
+      } else hint.style.opacity = 0;
+    });
+    canvas.addEventListener('mouseleave', function(){ hint.style.opacity = 0; state.hover = null; });
+    document.addEventListener('keydown', function(ev){
+      if (ev.key === 'ArrowRight') { state.day = Math.min(N-1, state.day+1); range.value = state.day; }
+      if (ev.key === 'ArrowLeft') { state.day = Math.max(0, state.day-1); range.value = state.day; }
+      if (ev.key === ' ') { document.getElementById('play').click(); ev.preventDefault(); }
+      syncText();
+    });
+    syncText();
+  }
+
+  function syncText(){
+    var d = state.day;
+    var dateStr = dates[d];
+    document.getElementById('date').textContent = dateStr;
+    document.getElementById('s-date').textContent = dateStr;
+    document.getElementById('range').value = d;
+    document.getElementById('s-total').textContent = fmt(totalAt(d), 1) + ' 例';
+    var g = totalAt(d) - totalAt(Math.max(0, d-7));
+    document.getElementById('s-delta').innerHTML = '<span style="color:' + (g>=0?'#ff5f6d':'#4cc9f0') + '">' + (g>=0?'+':'') + fmt(g,1) + '</span>';
+    var leap = d >= 1 ? totalAt(d) - totalAt(d-1) : 0;
+    if (state.playing){
+      document.getElementById('s-concl').textContent = leap >= 0 ? '病例在上升 — 沿接壤边看，先涨的城市正在把波传给邻居。' : '病例在回落 — 波峰已过，注意谁仍在滞后上升。';
+    }
+  }
+
+  function loop(ts){
+    if (!app){ requestAnimationFrame(loop); return; }
+    if (state.playing){
+      var dt = 0.016;
+      state.day += dt * state.speed;
+      if (state.day >= N - 1){ state.day = N - 1; state.playing = false; document.getElementById('play').textContent = '▶ 播放'; }
+      syncText();
+    }
+    draw(ts);
+    requestAnimationFrame(loop);
+  }
+
+  function draw(ts){
+    var d = Math.round(state.day);
+    ctx.clearRect(0,0,W,H);
+    var bg = ctx.createLinearGradient(0,0,0,H);
+    bg.addColorStop(0,'#081120'); bg.addColorStop(1,'#050b13');
+    ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
+
+    // 地图
+    cities.forEach(function(n){ ctx.fillStyle = '#0d1b2b'; ctx.fill(geoPaths[n]); });
+    cities.forEach(function(n){
+      ctx.strokeStyle = 'rgba(90,130,170,.35)';
+      ctx.lineWidth = 1;
+      ctx.stroke(geoPaths[n]);
+    });
+
+    // 城市节点：大小=水平，颜色=水平，脉冲=变化
+    var q99 = q(cities.map(function(n){ return cases(n,d); }), 0.98) || 1;
+    cities.forEach(function(n){
+      var c = centroids[n], v = cases(n,d) || 0, g = growth(n,d);
+      var r = 7 + 26 * Math.sqrt(clamp(v / q99, 0, 1));
+      var t = Math.sqrt(clamp(v / q99, 0, 1));
+      ctx.beginPath(); ctx.arc(c[0], c[1], r, 0, Math.PI*2);
+      ctx.fillStyle = colorRamp(t); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1.2; ctx.stroke();
+      // 变化脉冲
+      if (Math.abs(g) > 0.6){
+        var phase = ((ts * 0.00035) % 1);
+        var pr = r + 4 + phase * (10 + Math.min(20, Math.abs(g) * 3));
+        ctx.beginPath(); ctx.arc(c[0], c[1], pr, 0, Math.PI*2);
+        ctx.strokeStyle = (g >= 0 ? 'rgba(255,95,109,' : 'rgba(76,201,240,') + (0.55 * (1 - phase)) + ')';
+        ctx.lineWidth = 2.2; ctx.stroke();
+      }
+      ctx.font = '600 13px "Microsoft YaHei",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = state.hover === n ? '#fff' : '#dbeafe';
+      ctx.strokeStyle = 'rgba(4,10,18,.9)'; ctx.lineWidth = 3;
+      var label = n.replace('市','') + ' ' + fmt(v, 1);
+      ctx.strokeText(label, c[0], c[1] + r + 16);
+      ctx.fillText(label, c[0], c[1] + r + 16);
+    });
+
+    // 两层：底层=模型准静态结构（边宽∝平均注意权重，无方向）
+    //       上层=数据滞后相关给出的方向（仅视觉引导，非因果、非模型流量）
+    if (state.showFlow){
+      var wMin = Math.min.apply(null, pairMean), wMax = Math.max.apply(null, pairMean);
+      flowPairs.forEach(function(pair, pi){
+        var a = centroids[pair[0]], b = centroids[pair[1]];
+        if (!a || !b) return;
+        var t = clamp((pairMean[pi] - wMin) / Math.max(1e-6, wMax - wMin), 0, 1);
+        // 准静态结构底纹
+        ctx.strokeStyle = 'rgba(90,130,170,' + (0.18 + 0.30 * t) + ')';
+        ctx.lineWidth = 1.0 + 2.2 * t;
+        ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
+        // 数据方向粒子：仅当领先城市正在上升时出现
+        var lag = lead[pair[0] + '|' + pair[1]] || 0;
+        var forward = lag >= 0;
+        var leader = forward ? pair[0] : pair[1];
+        var gl = growth(leader, d);
+        if (gl <= 0.3) return;
+        var nP = 1 + Math.round(clamp(gl / 3, 0, 1) * 2);
+        for (var k=0;k<nP;k++){
+          var phase = ((ts * 0.00012 * (35 + Math.abs(lag)*6) + k / nP + (pi * 0.17)) % 1);
+          var p0 = forward ? a : b, p1 = forward ? b : a;
+          var x = p0[0] + (p1[0]-p0[0]) * phase;
+          var y = p0[1] + (p1[1]-p0[1]) * phase;
+          ctx.beginPath(); ctx.arc(x, y, 2.2 + t*2, 0, Math.PI*2);
+          ctx.fillStyle = lag >= 0 ? 'rgba(255,140,120,' + (0.35 + t*0.5) + ')' : 'rgba(120,200,255,' + (0.35 + t*0.5) + ')';
+          ctx.fill();
+        }
+      });
+    }
+
+    // 时间带（Hovmöller）
+    var sx = 90, sw = W - 2*sx, sy = STRIP_TOP, sh = STRIP_H;
+    ctx.fillStyle = '#0a1420'; ctx.fillRect(sx-40, sy-24, sw+80, sh+40);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(off, sx, sy, sw, sh);
+    // 行标签
+    ctx.font = '11px "Microsoft YaHei",sans-serif';
+    ctx.textAlign = 'right';
+    cities.forEach(function(n){
+      var row = latOrder.indexOf(n);
+      var y = sy + (row + 0.5) * sh / cities.length;
+      ctx.fillStyle = '#9fb3c8'; ctx.fillText(n.replace('市',''), sx - 8, y + 4);
+    });
+    // 年份刻度
+    var years = ['2015','2016','2017','2018','2019'];
+    ctx.textAlign = 'center'; ctx.fillStyle = '#7f95ad';
+    years.forEach(function(y){
+      var idx = dates.indexOf(y + '-01-01');
+      if (idx < 0) return;
+      var x = sx + idx / (N-1) * sw;
+      ctx.strokeStyle = 'rgba(140,170,200,.18)';
+      ctx.beginPath(); ctx.moveTo(x, sy); ctx.lineTo(x, sy+sh); ctx.stroke();
+      ctx.fillText(y, x, sy + sh + 16);
+    });
+    // 播放头
+    var px = sx + state.day / (N-1) * sw;
+    ctx.strokeStyle = '#f4b942'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(px, sy-8); ctx.lineTo(px, sy+sh+4); ctx.stroke();
+    ctx.fillStyle = '#f4b942';
+    ctx.beginPath(); ctx.moveTo(px, sy-14); ctx.lineTo(px-6, sy-24); ctx.lineTo(px+6, sy-24); ctx.closePath(); ctx.fill();
+    // 时间带 hover 提示由 mousemove 简单处理：略
+
+    // 图例
+    ctx.textAlign = 'left'; ctx.font = '12px "Microsoft YaHei",sans-serif';
+    ctx.fillStyle = '#8ba2bd';
+    ctx.fillText('圆点大小/颜色 = 当前病例水平；外圈脉冲 = 7 日变化（红升蓝降）；边底纹 = 模型注意权重的准静态结构（时间波动<0.4%）；光点 = 数据滞后相关方向（统计引导，非因果、非模型流量）', 90, 70);
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
