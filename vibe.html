@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>一个数字的旅程 · VIBE 知识大赏</title>
+<style>
+  :root{--bg:#050510;--gold:#c9a96a;--ivory:#e9e4d6;--dim:#8f8a7c}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ivory);font-family:"Microsoft YaHei",system-ui,sans-serif;overflow:hidden}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#050510}
+  canvas{display:block;width:min(100vw,177.78vh);height:min(56.25vw,100vh);background:#050510}
+  #ui{position:fixed;left:0;right:0;bottom:0;padding:10px 18px 14px;display:flex;align-items:center;gap:14px;background:linear-gradient(180deg,transparent,rgba(5,5,16,.9));opacity:.92;transition:opacity .3s}
+  #ui.hide{opacity:0;pointer-events:none}
+  #ui button{background:none;border:1px solid rgba(201,169,106,.4);color:var(--ivory);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;letter-spacing:.08em}
+  #ui input[type=range]{flex:1;accent-color:var(--gold)}
+  #ui .t{font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums;letter-spacing:.1em}
+  #ui a{color:var(--dim);font-size:11px;text-decoration:none;letter-spacing:.1em}
+  #poster{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#050510;cursor:pointer;z-index:5}
+  #poster .box{text-align:center}
+  #poster .k{font-size:11px;letter-spacing:.6em;color:var(--gold);margin-bottom:18px}
+  #poster h1{font-family:Georgia,"Times New Roman","SimSun",serif;font-weight:400;font-size:52px;letter-spacing:.06em;margin:0 0 12px;color:var(--ivory)}
+  #poster p{font-family:Georgia,serif;font-style:italic;color:var(--dim);margin:0;font-size:16px;letter-spacing:.04em}
+  body.record #ui, body.record #poster{display:none !important}
+  body.record{overflow:hidden}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="cv" width="1920" height="1080"></canvas></div>
+<div id="poster"><div class="box"><div class="k">VIBE 知识大赏</div><h1>一个数字的旅程</h1><p>The Journey of a Number</p></div></div>
+<div id="ui">
+  <button id="play">PLAY</button>
+  <span class="t" id="time">0:00 / 2:30</span>
+  <input type="range" id="range" min="0" max="150" step="0.1" value="0"/>
+  <a href="video/wmeg_vibe_2min30.mp4" download>MP4 ↓</a>
+  <a href="video/wmeg_vibe_2min30.srt" download>SRT ↓</a>
+  <a href="index.html">← 返回</a>
+</div>
+<script src="assets/vibe.js"></script>
+</body>
+</html>
