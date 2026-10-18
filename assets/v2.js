@@ -442,7 +442,11 @@
       var maxP = { v: -1, c: '' };
       DATA.meta.cities.forEach(function (c) { var p = gv(c.name, 'precip', state.idx) || 0; if (p > maxP.v) { maxP.v = p; maxP.c = c.name; } });
       var lv = rainLevel(maxP.v);
-      refs.note.textContent = '当日最大降水：' + (maxP.v > 0.1 ? maxP.c + ' ' + fmt(maxP.v, 1) + ' mm（' + RAIN_LEVELS[lv].name + '）' : '全省无降水');
+      if (state.view === '3d') {
+        refs.note.innerHTML = '旧版 3D（柱高 = 指标）· <a href="design/proto3d_v2.html" target="_blank" style="color:#f4b942">预览新版时空立方体 →</a>';
+      } else {
+        refs.note.textContent = '当日最大降水：' + (maxP.v > 0.1 ? maxP.c + ' ' + fmt(maxP.v, 1) + ' mm（' + RAIN_LEVELS[lv].name + '）' : '全省无降水');
+      }
     }
   }
   function updateFull() {
