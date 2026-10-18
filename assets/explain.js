@@ -1,17 +1,14 @@
 'use strict';
-/* ============================================================
-   一个样本的旅程 · 5 分钟数学动画（KaTeX 公式 + 真实矩阵）
-   ============================================================ */
+/* 一个数字的旅程 · 4:30 动画（KaTeX 公式 + 真实权重/激活） */
 (function () {
   var W = 1440, H = 740;
   var cv, ctx, dpr = 1, mathLayer;
-  var EX = null, APP = null, GEO = null, CITYMETA = null;
-  var T = 0, DUR = 300, playing = false, speed = 1, lastTs = 0, lastCaptionKey = '';
+  var EX = null, JR = null, APP = null, GEO = null, CITYMETA = null;
+  var T = 0, DUR = 270, playing = false, speed = 1, lastTs = 0, lastCaptionKey = '';
   var RECORD = false;
   try { RECORD = /[?&]record=1/.test(location.search); } catch (e) {}
   var COL = { txt: '#e8f0fa', muted: '#8ba2bd', line: '#1d3049', gold: '#f4b942', cyan: '#38bdf8', red: '#ff6b6b', green: '#4ade80', purple: '#a78bfa' };
   var CH = [];
-
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function ease(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
@@ -23,533 +20,465 @@
     ctx.fillStyle = color || COL.txt; ctx.textAlign = align || 'left'; ctx.textBaseline = 'middle';
     ctx.fillText(s, x, y);
   }
+  function mathText(s, x, y, size, color, align) {
+    ctx.font = '600 ' + size + 'px "Cambria Math","Times New Roman",serif';
+    ctx.fillStyle = color || COL.txt; ctx.textAlign = align || 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(s, x, y);
+  }
   function bg() {
     var g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, '#081321'); g.addColorStop(1, '#050a12');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    ctx.strokeStyle = 'rgba(120,170,220,0.04)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(120,170,220,0.035)'; ctx.lineWidth = 1;
     for (var x = 0; x <= W; x += 72) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
     for (var y = 0; y <= H; y += 72) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
   }
-  function setMath(items) {
-    // 公式统一放在画布下方的字幕条（KaTeX 排版），画布上不再覆盖公式卡，避免遮挡
-    if (mathLayer) mathLayer.innerHTML = '';
-  }
-  function mapPoint(lon, lat, box) {
-    var minLon = 110.2296, maxLon = 114.5689, minLat = 34.5835, maxLat = 40.7399;
-    var s = Math.min(box.w / (maxLon - minLon), box.h / (maxLat - minLat));
-    return [box.x + (lon - minLon) * s + (box.w - (maxLon - minLon) * s) / 2,
-            box.y + (maxLat - lat) * s + (box.h - (maxLat - minLat) * s) / 2];
+  function rollNumbers(tl, n, alpha) {
+    ctx.save();
+    ctx.font = '11px Consolas,monospace'; ctx.fillStyle = 'rgba(148,197,255,' + alpha + ')';
+    for (var i = 0; i < n; i++) {
+      var x = (i * 197 + 53) % W;
+      var y = ((i * 83 + tl * 18 * (0.6 + (i % 5) * 0.1)) % (H + 40)) - 20;
+      ctx.fillText((Math.sin(i * 7.3 + tl * 0.4) * 2).toFixed(2), x, y);
+    }
+    ctx.restore();
   }
   function panel(x, y, w, h, title) {
-    ctx.fillStyle = 'rgba(10,20,33,0.86)';
-    ctx.strokeStyle = 'rgba(56,189,248,0.16)'; ctx.lineWidth = 1;
+    ctx.fillStyle = 'rgba(10,20,33,0.86)'; ctx.strokeStyle = 'rgba(56,189,248,0.16)'; ctx.lineWidth = 1;
     roundRect(x, y, w, h, 12); ctx.fill(); ctx.stroke();
     if (title) txt(title, x + 14, y + 20, 13, COL.muted, 'left', 600);
   }
   function roundRect(x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
+    ctx.beginPath(); ctx.moveTo(x + r, y);
     ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
   }
-  function heat(v, div) {
-    // div=true: 以 0 为中心蓝-灰-红；否则青-金
-    var t = clamp(v, -1.8, 1.8) / 1.8;
-    if (!div) {
-      var u = clamp(v, 0, 1);
-      return 'rgba(' + Math.round(24 + 220 * u) + ',' + Math.round(95 + 100 * u) + ',' + Math.round(160 - 100 * u) + ',' + (0.18 + 0.6 * u) + ')';
-    }
-    if (t < 0) return 'rgba(56,140,200,' + (0.18 + 0.7 * (-t)) + ')';
-    return 'rgba(220,90,70,' + (0.18 + 0.7 * t) + ')';
+  function heat(v, lo, hi) {
+    var t = clamp((v - lo) / (hi - lo), 0, 1);
+    return 'rgba(' + Math.round(24 + 220 * t) + ',' + Math.round(95 + 100 * t) + ',' + Math.round(170 - 110 * t) + ',' + (0.16 + 0.65 * t) + ')';
   }
-  function matrix(x, y, cw, ch, values, rowLabels, colLabels, opts) {
+  function matrix(x, y, cw, ch, values, opts) {
     opts = opts || {};
     var r = values.length, c = values[0].length;
     var reveal = opts.reveal === undefined ? 1 : opts.reveal;
+    var lo = opts.lo !== undefined ? opts.lo : Math.min.apply(null, values.map(function (row) { return Math.min.apply(null, row); }));
+    var hi = opts.hi !== undefined ? opts.hi : Math.max.apply(null, values.map(function (row) { return Math.max.apply(null, row); }));
     for (var i = 0; i < r; i++) {
       for (var j = 0; j < c; j++) {
-        var a = clamp(reveal * (r + c) - (i + j), 0, 1);
-        if (a <= 0) continue;
-        var v = values[i][j];
+        var a = clamp(reveal * (r + c) - (i + j), 0, 1); if (a <= 0) continue;
         ctx.globalAlpha = a;
-        ctx.fillStyle = opts.color ? opts.color(v) : heat(v, opts.div);
+        ctx.fillStyle = opts.color ? opts.color(values[i][j]) : heat(values[i][j], lo, hi);
         ctx.fillRect(x + j * cw, y + i * ch, cw - 1.2, ch - 1.2);
-        if (opts.numbers !== false) {
-          ctx.fillStyle = 'rgba(232,240,250,0.92)';
-          ctx.font = (opts.font || 9.5) + 'px Consolas,"Segoe UI",monospace';
+        if (opts.numbers) {
+          ctx.fillStyle = 'rgba(235,243,252,0.92)';
+          ctx.font = (opts.font || 9) + 'px Consolas,"Segoe UI",monospace';
           ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-          ctx.fillText(fmt(v, opts.digits === undefined ? 2 : opts.digits), x + j * cw + cw / 2 - 0.6, y + i * ch + ch / 2);
+          ctx.fillText(fmt(values[i][j], opts.digits === undefined ? 2 : opts.digits), x + j * cw + cw / 2 - 0.6, y + i * ch + ch / 2);
         }
         ctx.globalAlpha = 1;
       }
     }
-    if (rowLabels) {
-      ctx.fillStyle = COL.muted; ctx.font = '9.5px "Microsoft YaHei",sans-serif';
-      ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-      for (var i2 = 0; i2 < r; i2++) ctx.fillText(rowLabels[i2], x - 8, y + i2 * ch + ch / 2);
-    }
-    if (colLabels) {
+    if (opts.rowLabels) {
       ctx.fillStyle = COL.muted; ctx.font = '9px "Microsoft YaHei",sans-serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      for (var j2 = 0; j2 < c; j2++) ctx.fillText(colLabels[j2], x + j2 * cw + cw / 2, y + r * ch + 6);
+      ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      for (var i2 = 0; i2 < r; i2++) ctx.fillText(opts.rowLabels[i2], x - 6, y + i2 * ch + ch / 2);
     }
     if (opts.highlightRow !== undefined) {
       ctx.strokeStyle = COL.gold; ctx.lineWidth = 2;
       ctx.strokeRect(x - 2, y + opts.highlightRow * ch - 2, c * cw + 3, ch + 3);
     }
-    if (opts.highlightCol !== undefined) {
-      ctx.strokeStyle = COL.cyan; ctx.lineWidth = 2;
-      ctx.strokeRect(x + opts.highlightCol * cw - 2, y - 2, cw + 3, r * ch + 3);
-    }
   }
 
-  /* ---------- Ch0：一个样本 / 一个 batch ---------- */
-  function drawIntro(tl) {
-    bg();
-    var prov = APP.meta.province.casesSmoothSum, n = prov.length;
-    var cx0 = 90, cx1 = 1350, cy = 150, chh = 90;
-    var mxv = Math.max.apply(null, prov) || 1;
-    ctx.strokeStyle = 'rgba(56,189,248,0.55)'; ctx.lineWidth = 1.3; ctx.beginPath();
-    for (var i = 0; i < n; i++) {
-      var x = cx0 + i / (n - 1) * (cx1 - cx0);
-      var y = cy + chh - (prov[i] || 0) / mxv * chh;
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-    var dates = APP.meta.dates;
-    var endIdx = dates.indexOf('2019-12-16'), t0 = endIdx - 19;
-    var wx0 = cx0 + t0 / (n - 1) * (cx1 - cx0), wx1 = cx0 + endIdx / (n - 1) * (cx1 - cx0);
-    var fx1 = cx0 + Math.min(n - 1, endIdx + 12) / (n - 1) * (cx1 - cx0);
-    ctx.fillStyle = 'rgba(56,189,248,0.20)'; ctx.fillRect(wx0, cy - 6, wx1 - wx0, chh + 12);
-    ctx.fillStyle = 'rgba(255,107,107,0.16)'; ctx.fillRect(wx1, cy - 6, fx1 - wx1, chh + 12);
-    txt('全省 11 城逐日平滑病例（2015–2019）', cx0, cy - 18, 11.5, COL.muted, 'left');
-    txt('2015', cx0, cy + chh + 18, 10.5, COL.muted, 'left');
-    txt('2019', cx1, cy + chh + 18, 10.5, COL.muted, 'right');
-    ctx.fillStyle = 'rgba(56,189,248,0.35)'; ctx.fillRect(cx0, cy + chh + 30, 12, 12);
-    txt('输入窗口 20 天', cx0 + 18, cy + chh + 37, 11.5, COL.cyan, 'left');
-    ctx.fillStyle = 'rgba(255,107,107,0.35)'; ctx.fillRect(cx0 + 150, cy + chh + 30, 12, 12);
-    txt('未来 12 步（标签）', cx0 + 168, cy + chh + 37, 11.5, COL.red, 'left');
-    // 左：样本张量
-    panel(80, 290, 790, 390, '');
-    txt('一个样本：20 天 × 11 城 × 16 通道', 100, 322, 14, COL.gold, 'left', 600);
-    var gx = 230, gy = 360, cw = 29, chH = 18;
-    for (var r = 0; r < 11; r++) {
-      for (var c = 0; c < 20; c++) {
-        var a = ease((tl - 1.5) / 3) * clamp((r + c) / 30, 0, 1);
-        ctx.globalAlpha = a;
-        ctx.fillStyle = r === 0 ? 'rgba(244,185,66,0.55)' : 'rgba(56,189,248,0.22)';
-        ctx.fillRect(gx + c * cw, gy + r * chH, cw - 2, chH - 2);
-        ctx.globalAlpha = 1;
-      }
-    }
-    txt('11 城', gx - 14, gy + 100, 10.5, COL.muted, 'right');
-    txt('20 天', gx + 290, gy + 218, 10.5, COL.muted, 'center');
-    txt('每格 = 一个城市的一天；深度方向是 16 个通道', gx - 140, gy + 240, 11, COL.muted, 'left');
-    txt('太原这一行 = 讲解样本', gx + 10, gy + 8, 10.5, COL.gold, 'left');
-    // 右：batch 32 个样本（8×4）
-    panel(900, 290, 460, 390, '');
-    txt('一个 batch = 32 个样本', 920, 322, 14, COL.gold, 'left', 600);
-    for (var b = 0; b < 32; b++) {
-      var col = b % 8, row = Math.floor(b / 8);
-      var bx = 928 + col * 52, by = 360 + row * 52;
-      ctx.globalAlpha = ease((tl - 1.2) / 2) * clamp(1.2 - b * 0.015, 0, 1);
-      ctx.fillStyle = b === 0 ? 'rgba(244,185,66,0.8)' : 'rgba(56,189,248,0.14)';
-      ctx.strokeStyle = b === 0 ? '#f4b942' : 'rgba(56,189,248,0.32)';
-      ctx.fillRect(bx, by, 44, 40); ctx.strokeRect(bx, by, 44, 40);
+  /* ---------- 0：公式 → 数字 ---------- */
+  function draw0(tl) {
+    bg(); rollNumbers(tl, 46, 0.05 + 0.03 * Math.sin(tl));
+    var ex = EX.example;
+    var cx = W / 2, y = 250;
+    ctx.globalAlpha = ease(tl / 2);
+    mathText('z = ( x − μ ) / σ', cx, y, 46, '#eaf3ff');
+    ctx.globalAlpha = 1;
+    var items = [
+      { t: 'x = ' + fmt(ex.case.smooth, 2), x: cx - 330, y: y + 80, at: 3 },
+      { t: 'μ = ' + fmt(ex.case.mu, 2), x: cx - 80, y: y + 80, at: 5 },
+      { t: 'σ = ' + fmt(ex.case.sigma, 2), x: cx + 170, y: y + 80, at: 7 }
+    ];
+    items.forEach(function (it) {
+      var a = ease((tl - it.at) / 1.2);
+      ctx.globalAlpha = a;
+      mathText(it.t, it.x, it.y, 24, COL.cyan);
+      ctx.globalAlpha = 1;
+    });
+    var p = ease((tl - 10) / 2);
+    if (p > 0) {
+      ctx.globalAlpha = p;
+      mathText('= ' + fmt(ex.case.z, 2), cx + 380, y + 80, 28, COL.gold);
       ctx.globalAlpha = 1;
     }
-    txt('高亮 = 我们讲解的第 1 个样本', 928, 620, 10.5, COL.gold, 'left');
-    txt('32 × 20 × 11 × 16 个数', 928, 646, 10.5, COL.muted, 'left');
+    if (tl > 14) {
+      var q = ease((tl - 14) / 3);
+      var tx = lerp(cx, 1080, q), ty = lerp(330, 600, q), sc = lerp(2.2, 0.9, q);
+      ctx.globalAlpha = 1 - 0.15 * q;
+      mathText(fmt(ex.case.z, 2), tx, ty, 30 * sc, COL.gold);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = 'rgba(244,185,66,0.5)'; ctx.lineWidth = 1.4;
+      ctx.strokeRect(tx - 26, ty - 20, 52, 40);
+      txt('这个数，会进入矩阵的一个格子', 1080 + 40, 600, 11.5, COL.muted, 'left');
+    }
+    txt('一切从一个数开始', 90, 120, 15, COL.gold, 'left', 600);
   }
 
-  /* ---------- Ch1：平滑（公式 + 数字计算） ---------- */
-  function drawSmooth(tl) {
-    bg();
-    var w = EX.window.matrix, raw = w.raw, sm = w.smooth, dates = w.dates;
-    panel(60, 110, 700, 400, '');
-    var bx = 110, by = 440, bw = 610, bh = 230;
-    var mx = Math.max.apply(null, raw.map(function (v) { return v || 0; }));
-    ctx.strokeStyle = 'rgba(148,163,184,0.25)'; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + bw, by); ctx.stroke();
+  /* ---------- 1：平滑滚动 + 标准化 ---------- */
+  function draw1(tl) {
+    bg(); rollNumbers(tl, 30, 0.04);
+    var w = EX.window.matrix, raw = w.raw, dates = w.dates, sm = w.smooth;
+    panel(60, 110, 700, 380, '');
+    txt('太原 · 20 天逐日报告数：7 个一滚动求和', 90, 142, 13.5, COL.gold, 'left', 600);
+    var bx = 110, by = 430, bw = 600, bh = 220;
+    var mx = Math.max.apply(null, raw);
     var stepX = bw / (raw.length - 1);
-    var reveal = ease((tl - 1) / 5);
+    var wi = clamp(Math.floor(ease((tl - 1) / 8) * (raw.length - 7)), 0, raw.length - 7);
+    var shown = ease((tl - 1) / 5);
     for (var i = 0; i < raw.length; i++) {
       var h = (raw[i] || 0) / mx * bh;
-      var alpha = reveal * clamp((i + 2) / 6, 0, 1);
-      ctx.globalAlpha = alpha;
-      var isLast7 = i >= raw.length - 7;
-      ctx.fillStyle = isLast7 ? 'rgba(244,185,66,0.85)' : 'rgba(148,163,184,0.5)';
-      ctx.fillRect(bx + i * stepX - stepX * 0.3, by - h, stepX * 0.6, h);
-      if (isLast7) {
-        txt(fmt(raw[i], 0), bx + i * stepX, by - h - 8, 10, COL.gold, 'center', 600);
-      }
+      ctx.globalAlpha = shown;
+      var inWin = i >= wi && i < wi + 7;
+      ctx.fillStyle = inWin ? 'rgba(244,185,66,0.85)' : 'rgba(148,163,184,0.45)';
+      ctx.fillRect(bx + i * stepX - stepX * 0.28, by - h, stepX * 0.56, h);
+      if (inWin) txt(fmt(raw[i], 0), bx + i * stepX, by - h - 9, 10.5, COL.gold, 'center', 600);
       ctx.globalAlpha = 1;
     }
-    for (var d = 0; d < raw.length; d += 4) {
-      txt(dates[d].slice(5), bx + d * stepX, by + 14, 9.5, COL.muted, 'center');
-    }
-    txt('太原 · 最近 20 天逐日报告数', 90, 140, 14, COL.gold, 'left', 600);
-    txt('原始计数 y(t)', 90, 470, 11.5, COL.muted, 'left');
-    txt('金色的 7 天 = 公式里的求和窗口（12-10 ~ 12-16）', 330, 470, 11, COL.gold, 'left');
-    // 平滑曲线
-    panel(790, 110, 590, 400, '');
-    txt('7 日平移平均后的 ȳ(t)', 810, 140, 14, COL.cyan, 'left', 600);
-    var px = 850, py = 430, pw = 490, ph = 240;
-    var smx = Math.max.apply(null, sm) || 1;
-    var prog = ease((tl - 12) / 12);
-    ctx.strokeStyle = COL.cyan; ctx.lineWidth = 2.6; ctx.beginPath();
-    var started = false;
-    for (var k = 0; k < sm.length; k++) {
-      if (k / (sm.length - 1) > prog) break;
-      var xx = px + k / (sm.length - 1) * pw;
-      var yy = py - sm[k] / smx * ph;
-      if (!started) { ctx.moveTo(xx, yy); started = true; } else ctx.lineTo(xx, yy);
+    txt('滑动窗口 7 天', bx + wi * stepX - 10, by + 16, 10.5, COL.gold, 'left');
+    var sum = 0; for (var k = wi; k < wi + 7; k++) sum += (raw[k] || 0);
+    var mean = sum / 7;
+    panel(60, 510, 700, 200, '');
+    txt('滚动计算', 90, 540, 13, COL.muted, 'left', 600);
+    mathText('ȳ = (' + fmt(raw[wi],1) + '+' + fmt(raw[wi+1],1) + '+…+' + fmt(raw[wi+6],1) + ') / 7 = ' + fmt(sum,1) + ' / 7 = ' + fmt(mean,2), 90, 580, 17, '#eaf3ff', 'left');
+    txt('窗口每移动一天，重算一次 → 得到整条平滑序列', 90, 620, 11.5, COL.muted, 'left');
+    // 右侧：标准化与钟形曲线
+    panel(790, 110, 590, 600, '');
+    txt('再标准化：把 6.29 变成 2.04', 820, 142, 13.5, COL.gold, 'left', 600);
+    var ex = EX.example;
+    mathText('z = (6.29 − 1.20) / 2.49 = 2.04', 820, 190, 20, '#eaf3ff', 'left');
+    var gx = 830, gy = 500, gw = 500, gh = 260;
+    ctx.strokeStyle = 'rgba(148,163,184,0.35)'; ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx + gw, gy); ctx.stroke();
+    var mu = 0.5, sig = 0.19;
+    ctx.strokeStyle = COL.cyan; ctx.lineWidth = 2; ctx.beginPath();
+    for (var px = 0; px <= gw; px += 4) {
+      var z = (px / gw - mu) / sig;
+      var yv = Math.exp(-0.5 * z * z);
+      var yy = gy - yv * gh * 0.85;
+      if (px === 0) ctx.moveTo(gx + px, yy); else ctx.lineTo(gx + px, yy);
     }
     ctx.stroke();
-    for (var k2 = 0; k2 < sm.length; k2++) {
-      if (k2 / (sm.length - 1) > prog) break;
-      var xx2 = px + k2 / (sm.length - 1) * pw;
-      var yy2 = py - sm[k2] / smx * ph;
-      ctx.beginPath(); ctx.arc(xx2, yy2, 3, 0, Math.PI * 2); ctx.fillStyle = COL.cyan; ctx.fill();
-      if (k2 === sm.length - 1) txt(fmt(sm[k2], 2), xx2 - 8, yy2 - 14, 12, COL.cyan, 'center', 600);
+    var zx = gx + (mu + ex.case.z * sig) * gw;
+    var zy = gy - Math.exp(-0.5 * ex.case.z * ex.case.z) * gh * 0.85;
+    var ap = ease((tl - 20) / 4);
+    if (ap > 0) {
+      ctx.beginPath(); ctx.arc(zx, zy, 7, 0, Math.PI * 2); ctx.fillStyle = COL.gold; ctx.fill();
+      txt('2.04（' + f2(ex.case.z) + 'σ）', zx + 12, zy - 14, 12, COL.gold, 'left', 600);
     }
-    txt('平滑序列（前 6 天 NaN，从第 7 天开始）', 850, 500, 10.5, COL.muted, 'left');
-    // 数值计算卡
-    var ex = EX.example;
-    panel(60, 530, 1320, 190, '');
-    txt('把公式代入最后一天：' + ex.date, 80, 560, 13.5, COL.gold, 'left', 600);
-    var nums = ex.raw7;
-    var parts = nums.map(function (v) { return fmt(v, 1); });
-    txt('y = [' + parts.join(', ') + ']', 90, 600, 14, '#dbeafe', 'left');
-    txt('ȳ = (' + parts.join(' + ') + ') / 7 = ' + fmt(ex.sum7, 2) + ' / 7 = ' + fmt(ex.mean7, 2), 90, 635, 14, COL.cyan, 'left');
-    txt('前 6 天窗口不足 7 天 → NaN；从第 7 天起才有平滑值。', 90, 675, 12, COL.muted, 'left');
+    txt('z 值 = 偏离训练段均值多少个标准差', 830, 690, 11, COL.muted, 'left');
   }
 
-  /* ---------- Ch2：气象去打季节 + 标准化 + 16 维 ---------- */
-  function drawWeather(tl) {
-    bg();
-    var s = EX.series, n = s.dates.length;
-    var ex = EX.example;
-    panel(60, 110, 740, 400, '');
-    txt('气象：先去掉季节，再标准化', 90, 142, 14, COL.gold, 'left', 600);
-    var lr = EX.window.matrix.X[EX.window.matrix.X.length - 1];
-    var tAn = lr[1], aAn = lr[2], pz = lr[3], cz = lr[0];
-    var items = [
-      { name: '气温 T', obs: ex.tavg.obs, clim: ex.tavg.obs - tAn, anom: tAn, color: COL.cyan },
-      { name: '绝对湿度 AH', obs: ex.ah.obs, clim: ex.ah.obs - aAn, anom: aAn, color: COL.green },
-      { name: '降水 P', obs: ex.precip.obs, z: pz, color: COL.purple }
-    ];
-    items.forEach(function (it, i) {
-      var y = 190 + i * 100;
-      txt(it.name, 90, y, 12.5, COL.muted, 'left', 600);
-      if (it.z !== undefined) {
-        txt('观测 ' + fmt(it.obs, 2) + ' → z(P) = ' + f2(it.z), 200, y, 12.5, '#cfe3f7', 'left');
-      } else {
-        txt('观测 ' + fmt(it.obs, 2) + '  −  气候基线 ' + fmt(it.clim, 2), 200, y, 12.5, '#cfe3f7', 'left');
-        txt('= 距平 ' + f2(it.anom), 620, y, 12.5, it.color, 'left');
-      }
-    });
-    txt('病例：' + fmt(ex.case.smooth, 2) + ' 例（平滑）→ z = ' + f2(cz), 90, 486, 12.5, COL.gold, 'left');
-    // 16 维向量
-    panel(840, 110, 540, 400, '');
-    txt('拼成这一天的输入向量 x_t ∈ ℝ¹⁶', 860, 142, 13.5, COL.gold, 'left', 600);
-    var vx = 880, vy = 190, cw = 48, ch = 34;
-    var vals = w_lastRow();
-    var labels = ['z(x)', 'T′', 'AH′', 'z(P)', 's1', 'c1', 's2', 'c2', 's3', 'c3', 's4', 'c4', 's5', 'c5', 's6', 'c6'];
-    var q = ease((tl - 14) / 8);
-    for (var i = 0; i < 16; i++) {
-      var x = vx + (i % 8) * cw, y = vy + Math.floor(i / 8) * 56;
-      ctx.globalAlpha = clamp(q * 20 - i, 0, 1);
-      ctx.fillStyle = heat(vals[i], true);
-      ctx.fillRect(x, y, cw - 2, ch);
-      txt(fmt(vals[i], 2), x + cw / 2 - 1, y + ch / 2, 9.5, '#f4f8ff', 'center');
-      txt(labels[i], x + cw / 2 - 1, y + ch + 12, 9, COL.muted, 'center');
-      ctx.globalAlpha = 1;
-    }
-    txt('病例 z + 温度距平 + 湿度距平 + 降水 z + 12 个日历谐波', 880, 480, 11.5, COL.muted, 'left');
-    setMath([
-      { tex: 'a_t=x_t-c(d_t)', x: 100, y: 560, cls: 'gold' },
-      { tex: 'z_t=\\frac{x_t-\\mu}{\\sigma}', x: 330, y: 560, cls: 'gold' },
-      { tex: '\\mathbf{x}_t=[z(x_t),\\tilde T_t,\\widetilde{AH}_t,z(P_t),\\sin_1,\\cos_1,\\ldots,\\sin_6,\\cos_6]^{\\top}\\in\\mathbb{R}^{16}', x: 560, y: 560, cls: 'lg' }
-    ]);
-  }
-  function w_lastRow() {
-    var X = EX.window.matrix.X;
-    return X[X.length - 1];
-  }
-
-  /* ---------- Ch3：矩阵画出来 ---------- */
-  function drawMatrixScene(tl) {
-    bg();
-    var w = EX.window.matrix;
-    var X = w.X, dates = w.dates;
-    var reveal = ease((tl - 2) / 10);
-    txt('这就是进入编码器的输入矩阵：每天 16 维，连续 20 天', 90, 80, 15, COL.gold, 'left', 600);
-    var x0 = 120, y0 = 120, cw = 58, ch = 23;
-    var rows = [];
-    for (var i = 0; i < X.length; i++) rows.push(X[i]);
-    var rowLabels = dates.map(function (d) { return d.slice(5); });
-    var colLabels = ['z(x)', 'T′', 'AH′', 'z(P)', 's1', 'c1', 's2', 'c2', 's3', 'c3', 's4', 'c4', 's5', 'c5', 's6', 'c6'];
-    matrix(x0, y0, cw, ch, rows, rowLabels, null, { reveal: reveal, digits: 2, font: 8.5, div: false });
-    // 列标签（顶部旋转）
-    ctx.save();
-    ctx.fillStyle = COL.muted; ctx.font = '9px "Microsoft YaHei",sans-serif';
-    for (var j = 0; j < 16; j++) {
-      ctx.save();
-      ctx.translate(x0 + j * cw + cw / 2 - 1, y0 - 8);
-      ctx.rotate(-Math.PI / 4);
-      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-      ctx.fillText(colLabels[j], 0, 0);
-      ctx.restore();
-    }
-    ctx.restore();
-    // 高亮最后一天
-    ctx.strokeStyle = COL.gold; ctx.lineWidth = 2.4;
-    ctx.strokeRect(x0 - 2, y0 + (rows.length - 1) * ch - 2, 16 * cw + 3, ch + 3);
-    txt('2019-12-16 这一行 = 输入向量 x_t', x0 + 16 * cw + 14, y0 + (rows.length - 1) * ch + ch / 2, 10, COL.gold, 'left');
-    // 右侧：11 城 z 矩阵
-    var px = 1120;
-    panel(px - 20, 110, 320, 300, '');
-    txt('11 城 × 20 天（z 病例）', px, 140, 12, COL.gold, 'left', 600);
-    var zc = EX.window.zCasesAll;
-    var zRows = [];
-    for (var r = 0; r < zc.length; r++) {
-      var row = [];
-      for (var c2 = 0; c2 < zc[r].length; c2++) row.push(zc[r][c2]);
-      zRows.push(row);
-    }
-    matrix(px + 8, 165, 24, 12, zRows, CITYMETA.map(function (c) { return c.short; }), null, { reveal: reveal, numbers: false, div: true });
-    txt('每个城市都有自己的 20×16 矩阵；batch 再把 32 个样本叠起来。', px - 10, 380, 11, COL.muted, 'left');
-    txt('行 = 日期（20 天） · 列 = 16 个通道 · 数值 = 标准化/距平后的输入', 90, 640, 13, COL.muted, 'left');
-    txt('进入编码器时，这个 20×16 矩阵会被当成一个"张量切片"处理；11 个城市并排得到 20×11×16。', 90, 666, 12, COL.muted, 'left');
-  }
-
-  /* ---------- Ch4：矩阵进入编码器 ---------- */
-  function drawEncoder(tl) {
-    bg();
-    var phase = tl < 34 ? 0 : (tl < 58 ? 1 : 2);
+  /* ---------- 2：矩阵滚动 ---------- */
+  function draw2(tl) {
+    bg(); rollNumbers(tl, 34, 0.04);
+    var phase = tl < 20 ? 0 : (tl < 36 ? 1 : 2);
     if (phase === 0) {
-      txt('矩阵进入编码器：多尺度因果卷积', 90, 80, 16, COL.gold, 'left', 700);
-      // 输入矩阵缩略
-      var w = EX.window.matrix, X = w.X;
-      var rows = []; for (var i = 0; i < 20; i++) rows.push(X[i]);
-      var reveal = ease((tl - 1) / 4);
-      matrix(100, 140, 26, 13, rows, null, null, { reveal: reveal, numbers: false, div: false });
-      txt('X: 20 天 × 16 通道', 100, 420, 11, COL.muted, 'left');
-      // 卷积示意
-      var bx = 520, by = 170, cw = 40, chh = 18;
-      for (var d = 0; d < 3; d++) {
-        var dil = [1, 2, 4][d];
-        var yy = by + d * 120;
-        txt('dilation = ' + dil, bx - 12, yy + 20, 12, COL.cyan, 'right', 600);
-        for (var t = 0; t < 20; t++) {
-          ctx.fillStyle = 'rgba(148,163,184,0.16)';
-          ctx.fillRect(bx + t * cw, yy, cw - 3, 40);
-        }
-        var pos = Math.min(15, Math.floor(clamp((tl - 4) / 20, 0, 1) * 15));
-        ctx.fillStyle = 'rgba(244,185,66,0.35)'; ctx.fillRect(bx + pos * cw, yy, cw - 3, 40);
-        for (var k = -2; k <= 0; k++) {
-          var src = pos + k * dil; if (src < 0) continue;
-          ctx.strokeStyle = 'rgba(56,189,248,0.55)'; ctx.lineWidth = 1.5;
-          ctx.beginPath(); ctx.moveTo(bx + src * cw + cw / 2, yy); ctx.lineTo(bx + pos * cw + cw / 2, yy + 40); ctx.stroke();
-        }
-      }
-      txt('未来', bx + 16 * cw, by - 22, 11, COL.red, 'left');
-      ctx.fillStyle = 'rgba(255,107,107,0.16)'; ctx.fillRect(bx + 16 * cw, by - 10, 4 * cw, 3 * 120 + 30);
-      setMath([
-        { tex: '\\mathbf{H}^{(d)}=\\sigma\\Big(\\sum_{m=0}^{K-1}\\mathbf{S}_{d\\,m}\\,\\mathbf{X}\\,\\mathbf{W}_m\\Big)', x: 900, y: 130, cls: 'lg gold' },
-        { tex: '\\mathbf{S}_m\\in\\{0,1\\}^{20\\times20}\\text{：把 }t-m\\text{ 移到 }t\\text{ 的移位矩阵（只看过去）}', x: 900, y: 220, cls: '' }
-      ]);
+      txt('第一步：16 × 20 输入矩阵逐格滚入（每一格是真实值）', 90, 86, 15, COL.gold, 'left', 600);
+      var X = EX.window.matrix.X;
+      var rows = []; for (var i = 0; i < X.length; i++) rows.push(X[i]);
+      var reveal = ease((tl - 1) / 10);
+      matrix(130, 130, 58, 23, rows, { reveal: reveal, numbers: true, digits: 2, font: 8.5, lo: -1.2, hi: 2.6 });
+      // 行标签
+      ctx.fillStyle = COL.muted; ctx.font = '9px "Microsoft YaHei",sans-serif'; ctx.textAlign = 'right';
+      for (var r = 0; r < 20; r++) ctx.fillText(EX.window.matrix.dates[r].slice(5), 122, 130 + r * 23 + 11);
+      ctx.strokeStyle = COL.gold; ctx.lineWidth = 2.4;
+      ctx.strokeRect(128, 130 + 19 * 23 - 2, 16 * 58 + 3, 23 + 3);
+      txt('2019-12-16 这一行 → 输入向量', 130 + 16 * 58 + 16, 130 + 19 * 23 + 11, 10.5, COL.gold, 'left');
+      txt('行 = 日期；列 = 16 个通道（病例 z、温度/湿度距平、降水 z、12 个日历谐波）', 90, 650, 11.5, COL.muted, 'left');
     } else if (phase === 1) {
-      txt('城际图：19 条行政接壤边上的消息传递', 90, 80, 16, COL.gold, 'left', 700);
-      var box = { x: 200, y: 150, w: 520, h: 430 };
-      var nodes = CITYMETA.map(function (c) { return { name: c.name, p: mapPoint(c.lon, c.lat, box) }; });
-      var idx = {}; nodes.forEach(function (n2, i) { idx[n2.name] = i; });
-      ctx.strokeStyle = 'rgba(120,170,220,0.32)'; ctx.lineWidth = 1.2;
-      CITYMETA.forEach(function (c) {
-        c.neighbors.forEach(function (nb) {
-          if (c.name < nb) {
-            var a = nodes[idx[c.name]].p, b = nodes[idx[nb]].p;
-            ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
-          }
-        });
-      });
-      nodes.forEach(function (n2, i) {
-        ctx.beginPath(); ctx.arc(n2.p[0], n2.p[1], 6, 0, Math.PI * 2); ctx.fillStyle = '#0ea5e9'; ctx.fill();
-        txt(CITYMETA[i].short, n2.p[0], n2.p[1] - 14, 10.5, '#cfe3f7', 'center');
-        var ph = (tl * 0.7 + i * 0.3) % 1;
-        ctx.beginPath(); ctx.arc(n2.p[0], n2.p[1], 7 + ph * 16, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(56,189,248,' + (0.45 * (1 - ph)) + ')'; ctx.lineWidth = 1.4; ctx.stroke();
-      });
-      // C 矩阵 11×11 热图
-      var C = [];
-      var deg = CITYMETA.map(function (c) { return c.neighbors.length; });
-      for (var i2 = 0; i2 < 11; i2++) {
-        var row = [];
-        for (var j2 = 0; j2 < 11; j2++) {
-          if (i2 === j2) row.push(1 / (deg[i2] + 1));
-          else if (CITYMETA[i2].neighbors.indexOf(CITYMETA[j2].name) >= 0) row.push(1 / (deg[i2] + 1));
-          else row.push(0);
-        }
-        C.push(row);
-      }
-      panel(820, 150, 520, 430, '');
-      txt('行随机注意权重 C（准静态结构先验）', 840, 182, 12.5, COL.muted, 'left', 600);
-      matrix(870, 210, 34, 26, C, null, null, { reveal: ease((tl - 2) / 6), numbers: false,
-        color: function (v) { return 'rgba(56,189,248,' + (0.05 + 0.75 * Math.min(1, v / 0.34)) + ')'; } });
-      txt('每行和 = 1；受 19 条接壤边掩码约束', 870, 540, 11, COL.muted, 'left');
-      setMath([
-        { tex: "\\mathbf{h}'_i=\\sum_{j\\in\\mathcal{N}(i)}C_{ij}\\,\\mathbf{h}_j", x: 840, y: 590, cls: 'lg gold' }
-      ]);
+      txt('第二步：32 个样本 × 16 维（取每个窗口最后一天）', 90, 86, 15, COL.gold, 'left', 600);
+      var B = JR.batchMatrix;
+      var revealB = ease((tl - 20) / 6);
+      matrix(150, 130, 58, 17, B, { reveal: revealB, numbers: true, digits: 2, font: 8, lo: -1.2, hi: 2.6 });
+      ctx.fillStyle = COL.muted; ctx.font = '9px "Microsoft YaHei",sans-serif'; ctx.textAlign = 'right';
+      for (var b = 0; b < 32; b++) ctx.fillText('#' + (b + 1), 142, 130 + b * 17 + 8);
+      ctx.strokeStyle = COL.gold; ctx.lineWidth = 2.4;
+      ctx.strokeRect(148, 130 - 2, 16 * 58 + 3, 17 + 3);
+      txt('第 1 个样本就是我们的太原窗口；第一格 = 2.04', 150 + 16 * 58 + 16, 148, 11, COL.gold, 'left');
+      txt('一个 batch 共 32 个样本，叠起来才是训练时真正喂给网络的数据。', 90, 692, 11.5, COL.muted, 'left');
     } else {
-      txt('时间投影与双头：20 → 12 步', 90, 80, 16, COL.gold, 'left', 700);
-      var blocks = [
-        { y: 180, label: '时空特征  H ∈ ℝ^{20×32}', color: 'rgba(56,189,248,0.35)', w: 560 },
-        { y: 300, label: '时间投影  W=20 → H=12', color: 'rgba(167,139,250,0.35)', w: 680 },
-        { y: 420, label: '直接头  输出 12 步病例  ŷ ∈ ℝ^{12×11}', color: 'rgba(244,185,66,0.4)', w: 800 }
-      ];
-      blocks.forEach(function (b, i) {
-        var x = 180;
-        ctx.fillStyle = b.color; ctx.strokeStyle = 'rgba(200,230,255,0.35)';
-        roundRect(x, b.y - 34, b.w, 68, 10); ctx.fill(); ctx.stroke();
-        txt(b.label, x + 20, b.y, 13, '#e6f3ff', 'left', 600);
-        if (i < 2) {
-          ctx.strokeStyle = 'rgba(148,197,255,0.5)'; ctx.lineWidth = 2;
-          ctx.beginPath(); ctx.moveTo(x + b.w / 2, b.y + 34); ctx.lineTo(x + b.w / 2, b.y + 52); ctx.stroke();
-        }
+      txt('权重矩阵 W：32 个特征 × 16 个输入通道（这是要学习的参数）', 90, 86, 15, COL.gold, 'left', 600);
+      var WT = JR.WTrained;
+      var revealW = ease((tl - 36) / 6);
+      matrix(150, 130, 44, 14, WT, { reveal: revealW, numbers: false, lo: -0.8, hi: 0.8, highlightRow: 10 });
+      ctx.fillStyle = COL.muted; ctx.font = '9px "Microsoft YaHei",sans-serif'; ctx.textAlign = 'right';
+      for (var f = 0; f < 32; f += 2) ctx.fillText('#' + (f + 1), 142, 130 + f * 14 + 7);
+      txt('高亮 = 第 11 个特征（动画主角）', 150 + 16 * 44 + 18, 150, 11, COL.gold, 'left');
+      // 第 10 行数值条
+      panel(880, 130, 500, 460, '');
+      txt('第 11 行的 16 个权重（学到的值）', 900, 162, 13, COL.gold, 'left', 600);
+      var rowW = WT[10];
+      rowW.forEach(function (v, j) {
+        var x = 900 + (j % 8) * 58, y = 200 + Math.floor(j / 8) * 90;
+        ctx.fillStyle = heat(v, -0.8, 0.8);
+        ctx.fillRect(x, y, 52, 44);
+        ctx.fillStyle = '#0b1624'; ctx.font = '11px Consolas,monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(fmt(v, 2), x + 26, y + 22);
+        ctx.fillStyle = COL.muted; ctx.font = '9px "Microsoft YaHei",sans-serif';
+        ctx.fillText('c' + (j + 1), x + 26, y + 58);
       });
-      ctx.strokeStyle = 'rgba(167,139,250,0.7)'; ctx.setLineDash([5, 5]);
-      ctx.beginPath(); ctx.moveTo(620, 300); ctx.lineTo(760, 300); ctx.lineTo(760, 500); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(167,139,250,0.22)'; roundRect(760, 466, 480, 68, 10); ctx.fill();
-      txt('机理头（仅训练辅助）：β 解码 + SC-SIRS', 780, 500, 12.5, '#e6f3ff', 'left', 600);
-      setMath([
-        { tex: '\\hat{\\mathbf{y}}=\\mathbf{W}_{out}\\,\\mathrm{vec}(\\mathbf{H}_{12})\\in\\mathbb{R}^{12\\times11}', x: 180, y: 560, cls: 'lg gold' },
-        { tex: '\\mathcal{L}=\\mathcal{L}_{\\mathrm{fuse}}+\\lambda_{\\mathrm{aux}}\\mathcal{L}_{\\mathrm{mech}}', x: 980, y: 560, cls: '' }
-      ]);
+      txt('w₁₁,₁ … w₁₁,₁₆', 900, 400, 12, COL.muted, 'left');
+      txt('每个数都是训练出来的；下一章看它怎么和输入相乘。', 900, 440, 11, COL.muted, 'left');
     }
   }
 
-  /* ---------- Ch5：训练 ---------- */
-  function drawTraining(tl) {
-    bg();
-    panel(60, 110, 1320, 500, '');
-    txt('训练：在 1,213 个训练窗口上最小化误差', 90, 144, 15, COL.gold, 'left', 700);
-    var curves = EX.loss.curves, seeds = Object.keys(curves);
-    var maxEp = 0, maxV = 0, minV = 1;
-    seeds.forEach(function (s) { curves[s].forEach(function (p) { maxEp = Math.max(maxEp, p[0]); maxV = Math.max(maxV, p[2]); minV = Math.min(minV, p[2]); }); });
-    var bx = 150, by = 210, bw = 860, bh = 340;
+  /* ---------- 3：一个数字穿过编码器 ---------- */
+  function draw3(tl) {
+    bg(); rollNumbers(tl, 28, 0.035);
+    var x = JR.x, ft = JR.featureTrace, e = JR.meta.feature;
+    var w = ft.wTrained, b = JR.biasTrained[e];
+    var phase = tl < 22 ? 0 : (tl < 34 ? 1 : 2);
+    if (phase === 0) {
+      txt('这个数字 2.04 与 32×16 权重矩阵的第 11 行相乘', 90, 80, 15, COL.gold, 'left', 600);
+      // 左侧：16 对乘积累加
+      var sum = 0;
+      var prog = clamp((tl - 1) / 18, 0, 1);
+      var done = Math.floor(prog * 16);
+      for (var i = 0; i < 16; i++) {
+        var row = Math.floor(i / 8), col = i % 8;
+        var xx = 110 + col * 118, yy = 170 + row * 120;
+        if (i <= done) {
+          sum += x[i] * w[i];
+          ctx.fillStyle = 'rgba(56,189,248,0.12)';
+          roundRect(xx, yy, 108, 84, 8); ctx.fill();
+          txt('x' + (i + 1) + ' = ' + fmt(x[i], 2), xx + 10, yy + 18, 10, COL.muted, 'left');
+          txt('w = ' + fmt(w[i], 2), xx + 10, yy + 38, 10, COL.cyan, 'left');
+          txt('= ' + fmt(x[i] * w[i], 2), xx + 10, yy + 62, 12, COL.gold, 'left', 600);
+        }
+      }
+      panel(1060, 150, 320, 380, '');
+      txt('累加 → 加偏置', 1080, 182, 13, COL.gold, 'left', 600);
+      mathText('Σ = ' + fmt(sum, 2), 1080, 230, 20, '#eaf3ff', 'left');
+      mathText('+ b = ' + fmt(b, 2), 1080, 278, 16, COL.muted, 'left');
+      mathText('pre = ' + fmt(ft.preTrained, 3), 1080, 340, 22, COL.cyan, 'left');
+      txt('这是第 11 个特征在训练后的净输入', 1080, 390, 11, COL.muted, 'left');
+      matrix(110, 440, 12, 6, JR.WTrained, { numbers: false, lo: -0.8, hi: 0.8, highlightRow: 10 });
+      txt('W：32 个特征 × 16 个通道，高亮第 11 行', 110, 668, 10.5, COL.muted, 'left');
+      txt('每一对 x·w 都是真实数值（x 来自输入向量，w 来自训练好的权重）', 330, 620, 11, COL.muted, 'left');
+    } else if (phase === 1) {
+      txt('激活函数 GELU 把它再变一次', 90, 80, 15, COL.gold, 'left', 600);
+      var gx = 200, gy = 480, gw = 900, gh = 300;
+      ctx.strokeStyle = 'rgba(148,163,184,0.3)'; ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx + gw, gy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(gx + gw / 2, gy - gh); ctx.lineTo(gx + gw / 2, gy + 30); ctx.stroke();
+      ctx.strokeStyle = COL.cyan; ctx.lineWidth = 2.4; ctx.beginPath();
+      function gelu(z) { return 0.5 * z * (1 + Math.tanh(Math.sqrt(2 / Math.PI) * (z + 0.044715 * z * z * z))); }
+      for (var p = -4; p <= 4; p += 0.02) {
+        var X = gx + (p + 4) / 8 * gw;
+        var Y = gy - gelu(p) * 70;
+        if (p === -4) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
+      }
+      ctx.stroke();
+      var p0 = ft.preTrained;
+      var X0 = gx + (p0 + 4) / 8 * gw, Y0 = gy - gelu(p0) * 70;
+      var ap = ease((tl - 22) / 3);
+      if (ap > 0) {
+        ctx.beginPath(); ctx.arc(X0, Y0, 7, 0, Math.PI * 2); ctx.fillStyle = COL.gold; ctx.fill();
+        txt('pre = ' + fmt(p0, 3), X0 + 14, Y0 - 12, 12, COL.gold, 'left', 600);
+        txt('GELU(pre) = ' + fmt(ft.postTrained, 3), X0 + 14, Y0 + 12, 12, COL.green, 'left', 600);
+      }
+      mathText('GELU(z) = 0.5z(1 + tanh(√(2/π)(z + 0.044715 z³)))', 300, 120, 16, '#bfe3ff', 'left');
+    } else {
+      txt('同一个特征继续往后走：编码器 → 图 → 投影 → 输出', 90, 80, 15, COL.gold, 'left', 600);
+      var st = JR.chain.stages;
+      var names = ['投影+GELU', '编码器输出', '时间投影', '预测输出'];
+      var vals = [ft.postTrained, st[1].trained, st[2].trained, st[3].trained];
+      for (var k = 0; k < 4; k++) {
+        var x0 = 120 + k * 320, y0 = 230;
+        ctx.fillStyle = 'rgba(56,189,248,0.14)'; ctx.strokeStyle = 'rgba(56,189,248,0.45)';
+        roundRect(x0, y0, 270, 120, 12); ctx.fill(); ctx.stroke();
+        txt(names[k], x0 + 14, y0 + 22, 12, COL.muted, 'left', 600);
+        mathText(fmt(vals[k], 3), x0 + 14, y0 + 70, 26, k === 3 ? COL.gold : '#eaf3ff', 'left');
+        if (k < 3) {
+          ctx.strokeStyle = 'rgba(148,197,255,0.7)'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(x0 + 270, y0 + 60); ctx.lineTo(x0 + 300, y0 + 60); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x0 + 300, y0 + 60); ctx.lineTo(x0 + 292, y0 + 54); ctx.moveTo(x0 + 300, y0 + 60); ctx.lineTo(x0 + 292, y0 + 66); ctx.stroke();
+        }
+      }
+      txt('同一组输入下，这个特征值从 -0.120 一路被变换成预测 6.57（第 1 步）', 120, 420, 13, COL.muted, 'left');
+      txt('注意：中间每一步都来自真实模型的前向计算，不是示意图。', 120, 452, 12, COL.muted, 'left');
+      txt('输出端：太原 12 步预测从这里展开', 120, 510, 13, COL.cyan, 'left', 600);
+    }
+  }
+
+  /* ---------- 4：学习：权重从初始化到训练后 ---------- */
+  function draw4(tl) {
+    bg(); rollNumbers(tl, 24, 0.03);
+    txt('学习过程：同一个 32×16 权重矩阵，初始化 vs 训练后', 90, 80, 15, COL.gold, 'left', 600);
+    var WI = JR.WInit, WT = JR.WTrained;
+    var x0 = 110, y0 = 140, cw = 15, ch = 9;
+    // 初始化
+    matrix(x0, y0, cw, ch, WI, { reveal: 1, numbers: false, lo: -0.8, hi: 0.8, highlightRow: 10 });
+    txt('初始化 W（随机）', x0, y0 + 32 * ch + 22, 11, COL.muted, 'left', 600);
+    // 训练后
+    var x1 = x0 + 16 * cw + 120;
+    matrix(x1, y0, cw, ch, WT, { reveal: 1, numbers: false, lo: -0.8, hi: 0.8, highlightRow: 10 });
+    txt('训练后 W（学习到的）', x1, y0 + 32 * ch + 22, 11, COL.muted, 'left', 600);
+    // 第 11 行权重对比条
+    var bx = 900, by = 130;
+    panel(bx - 20, by - 20, 520, 360, '');
+    txt('第 11 行的 16 个权重：初始化 → 训练后', bx, by + 10, 12.5, COL.gold, 'left', 600);
+    var p = ease((tl - 2) / 14);
+    for (var j = 0; j < 16; j++) {
+      var yy = by + 40 + j * 18;
+      var v0 = WI[10][j], v1 = WT[10][j];
+      var vv = lerp(v0, v1, p);
+      txt('w' + (j + 1), bx, yy, 9.5, COL.muted, 'left');
+      ctx.fillStyle = 'rgba(148,163,184,0.15)'; ctx.fillRect(bx + 34, yy - 6, 200, 12);
+      ctx.fillStyle = 'rgba(56,189,248,0.55)'; ctx.fillRect(bx + 34, yy - 6, 200 * clamp((vv + 0.8) / 1.6, 0, 1), 12);
+      txt(fmt(v0, 2) + ' → ' + fmt(v1, 2), bx + 250, yy, 9.5, j === 0 ? COL.gold : COL.muted, 'left');
+    }
+    // 激活/输出变化
+    var st = JR.chain.stages;
+    panel(90, 500, 540, 210, '');
+    txt('同一个输入：初始化 → 训练后', 110, 528, 12.5, COL.gold, 'left', 600);
+    var rows = [
+      ['pre（净输入）', JR.featureTrace.preInit, JR.featureTrace.preTrained],
+      ['GELU 激活', JR.featureTrace.postInit, JR.featureTrace.postTrained],
+      ['编码器输出', st[1].init, st[1].trained],
+      ['时间投影', st[2].init, st[2].trained],
+      ['输出（第 1 步）', JR.output.init[0], JR.output.trained[0]]
+    ];
+    rows.forEach(function (r, k) {
+      var yy = 558 + k * 28;
+      txt(r[0], 110, yy, 11, COL.muted, 'left');
+      txt(fmt(r[1], 3), 350, yy, 11.5, '#94a3b8', 'right');
+      txt('→', 378, yy, 11, COL.muted, 'center');
+      txt(fmt(r[2], 3), 450, yy, 12, COL.gold, 'right', 600);
+    });
+    // 输出曲线
+    var O = JR.output, n = O.dates.length;
+    panel(650, 500, 710, 210, '');
+    txt('12 步输出：初始化 vs 训练后 vs 真值', 670, 528, 12.5, COL.gold, 'left', 600);
+    var ox = 690, oy = 560, ow = 520, oh = 110;
+    var allv = O.true.concat(O.init, O.trained);
+    var mn = Math.min.apply(null, allv), mx = Math.max.apply(null, allv);
+    function oyOf(v) { return oy + oh - (v - mn) / (mx - mn + 1e-6) * oh; }
+    function line(vals, color, w) {
+      ctx.strokeStyle = color; ctx.lineWidth = w; ctx.beginPath();
+      for (var i = 0; i < n; i++) { var x = ox + i / (n - 1) * ow; var y = oyOf(vals[i]); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
+    line(O.true, '#e8f0fa', 2.4); line(O.init, 'rgba(148,163,184,0.8)', 1.4); line(O.trained, COL.gold, 2.4);
+    txt('真值', ox, oy + oh + 16, 10, '#e8f0fa', 'left');
+    txt('初始化', ox + 44, oy + oh + 16, 10, '#94a3b8', 'left');
+    txt('训练后', ox + 108, oy + oh + 16, 10, COL.gold, 'left');
+  }
+
+  /* ---------- 5：15 个种子与损失曲线 ---------- */
+  function draw5(tl) {
+    bg(); rollNumbers(tl, 20, 0.025);
+    panel(60, 100, 1320, 560, '');
+    txt('15 个随机种子：训练/验证损失与最终集成', 90, 134, 15, COL.gold, 'left', 600);
+    var curves = JR.loss.curves, keys = Object.keys(curves);
+    var maxEp = 0, logMin = Infinity, logMax = -Infinity;
+    keys.forEach(function (s) { curves[s].forEach(function (p) { maxEp = Math.max(maxEp, p[0]); var lv = Math.log10(Math.max(p[2], 0.02)); logMin = Math.min(logMin, lv); logMax = Math.max(logMax, lv); }); });
+    var bx = 150, by = 200, bw = 840, bh = 340;
     ctx.strokeStyle = 'rgba(148,163,184,0.2)'; ctx.strokeRect(bx, by, bw, bh);
-    var prog = clamp((tl - 2) / 22, 0, 1);
-    var cols = [COL.gold, 'rgba(56,189,248,0.6)', 'rgba(74,222,128,0.6)'];
-    seeds.forEach(function (s, si) {
+    // 网格
+    ctx.strokeStyle = 'rgba(148,163,184,0.12)'; ctx.lineWidth = 1;
+    for (var gt = 1; gt < 5; gt++) { var gy = by + gt / 5 * bh; ctx.beginPath(); ctx.moveTo(bx, gy); ctx.lineTo(bx + bw, gy); ctx.stroke(); }
+    for (var gx2 = 1; gx2 < 5; gx2++) { var gx3 = bx + gx2 / 5 * bw; ctx.beginPath(); ctx.moveTo(gx3, by); ctx.lineTo(gx3, by + bh); ctx.stroke(); }
+    txt('log₁₀(验证损失)', bx - 10, by - 14, 10.5, COL.muted, 'left');
+    txt('epoch', bx + bw / 2, by + bh + 16, 10.5, COL.muted, 'center');
+    txt('0', bx, by + bh + 16, 9.5, COL.muted, 'center');
+    txt(String(maxEp), bx + bw, by + bh + 16, 9.5, COL.muted, 'center');
+    var prog = clamp((tl - 2) / 18, 0, 1);
+    keys.forEach(function (s, si) {
       var arr = curves[s];
-      ctx.strokeStyle = cols[si]; ctx.lineWidth = si === 0 ? 2.6 : 1.4;
+      ctx.strokeStyle = si === 0 ? COL.gold : 'rgba(56,189,248,' + (0.14 + 0.03 * (si % 4)) + ')';
+      ctx.lineWidth = si === 0 ? 2.2 : 1;
       ctx.beginPath();
       var upto = Math.floor(prog * (arr.length - 1));
       for (var i = 0; i <= upto; i++) {
         var x = bx + arr[i][0] / maxEp * bw;
-        var y = by + bh - (arr[i][2] - minV * 0.9) / (maxV * 1.1 - minV * 0.9) * bh;
+        var lv = Math.log10(Math.max(arr[i][2], 0.02));
+        var y = by + bh - (lv - logMin) / (logMax - logMin + 1e-6) * bh;
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       ctx.stroke();
     });
-    var best = curves[seeds[0]].reduce(function (a, b) { return b[2] < a[2] ? b : a; }, curves[seeds[0]][0]);
-    var bx2 = bx + best[0] / maxEp * bw, by2 = by + bh - (best[2] - minV * 0.9) / (maxV * 1.1 - minV * 0.9) * bh;
-    ctx.beginPath(); ctx.arc(bx2, by2, 5, 0, Math.PI * 2); ctx.fillStyle = COL.gold; ctx.fill();
-    txt('best epoch ' + best[0] + ' · val ' + fmt(best[2], 3), bx2 + 10, by2 - 14, 11.5, COL.gold, 'left', 600);
-    txt('验证损失', bx - 10, by - 14, 10.5, COL.muted, 'left');
-    txt('epoch', bx + bw / 2, by + bh + 16, 10.5, COL.muted, 'center');
-    txt('AdamW · lr 5e-4 · batch 32 · early stop 20', 150, 590, 12, COL.muted, 'left');
-    txt('15 个随机种子 → 集成', 1100, 300, 12.5, COL.cyan, 'left');
-    txt('集成 RMSE 2.1611', 1100, 330, 12.5, COL.gold, 'left', 600);
-    setMath([
-      { tex: '\\mathcal{L}=\\frac{1}{32\\cdot11\\cdot12}\\sum_{b,i,h}\\big(\\hat y_{b,i,h}-y_{b,i,h}\\big)^2', x: 150, y: 620, cls: '' },
-      { tex: '\\hat{\\mathbf{y}}^{\\mathrm{ens}}=\\frac{1}{15}\\sum_{s=1}^{15}\\hat{\\mathbf{y}}_s', x: 900, y: 620, cls: '' }
-    ]);
-  }
-
-  /* ---------- Ch6：预测与校准 ---------- */
-  function drawEval(tl) {
-    bg();
-    var tg = EX.target, n = tg.dates.length;
-    panel(60, 110, 860, 480, '');
-    txt('测试集里的这个样本：太原 2019-12-17 ~ 12-28', 90, 144, 14, COL.gold, 'left', 600);
-    var bx = 130, by = 200, bw = 720, bh = 320;
-    var all = tg.cityTrue.concat(tg.p90, tg.p10, tg.cityPred);
-    var ymin = Math.min.apply(null, all) * 0.85, ymax = Math.max.apply(null, all) * 1.1;
-    ctx.strokeStyle = 'rgba(148,163,184,0.18)'; ctx.strokeRect(bx, by, bw, bh);
-    var stepX = bw / (n - 1);
-    function yOf(v) { return by + bh - (v - ymin) / (ymax - ymin) * bh; }
-    var q = clamp((tl - 1) / 8, 0, 1);
-    ctx.fillStyle = 'rgba(244,185,66,0.18)';
-    ctx.beginPath();
-    for (var i = 0; i < n; i++) {
-      var x = bx + i * stepX;
-      if (i === 0) ctx.moveTo(x, yOf(lerp(tg.cityPred[i], tg.p90[i], q))); else ctx.lineTo(x, yOf(lerp(tg.cityPred[i], tg.p90[i], q)));
-    }
-    for (var j = n - 1; j >= 0; j--) ctx.lineTo(bx + j * stepX, yOf(lerp(tg.cityPred[j], tg.p10[j], q)));
-    ctx.closePath(); ctx.fill();
-    function line(vals, color, w) {
-      ctx.strokeStyle = color; ctx.lineWidth = w; ctx.beginPath();
-      for (var k = 0; k < n; k++) { var xx = bx + k * stepX, yy = yOf(vals[k]); if (k === 0) ctx.moveTo(xx, yy); else ctx.lineTo(xx, yy); }
-      ctx.stroke();
-    }
-    line(tg.cityTrue, '#e8f0fa', 2.6);
-    line(tg.cityPred, COL.gold, 2.6);
-    txt('真实', bx + 6, by + 14, 11.5, '#e8f0fa', 'left', 600);
-    txt('集成预测', bx + 56, by + 14, 11.5, COL.gold, 'left', 600);
-    txt('15 种子 P10–P90', bx + 136, by + 14, 11.5, 'rgba(244,185,66,0.85)', 'left');
-    panel(960, 110, 420, 480, '');
-    var cards = [['总体 RMSE', '2.1611'], ['校准后 α=0.25', '2.0125'], ['持续性基线', '2.1225'], ['总体 PCC', '0.8143']];
+    var cards = [['总体 RMSE', '2.1611'], ['校准后', '2.0125'], ['持续性', '2.1225'], ['PCC', '0.8143']];
     cards.forEach(function (c, i) {
-      var y = 150 + i * 104;
-      txt(c[0], 984, y, 11.5, COL.muted, 'left');
-      txt(c[1], 984, y + 30, 24, i === 1 ? COL.gold : '#e8f0fa', 'left', 700);
+      var x = 1030, y = 210 + i * 100;
+      txt(c[0], x, y, 11, COL.muted, 'left');
+      txt(c[1], x, y + 30, 24, i === 1 ? COL.gold : '#e8f0fa', 'left', 700);
     });
-    txt('这个样本峰值被低估（预测≈6，真值→12），', 90, 620, 12, COL.muted, 'left');
-    txt('但校准后整体误差仍低于"照抄昨天"。', 90, 644, 12, COL.muted, 'left');
-    setMath([
-      { tex: '\\hat y^{\\mathrm{cal}}_t=y_{\\mathrm{last}}+\\alpha\\big(\\hat y_t-y_{\\mathrm{last}}\\big),\\quad\\alpha=0.25', x: 720, y: 620, cls: '' }
-    ]);
+    txt('15 个种子 → 平均集成，降低单次初始化/采样的波动（这是集成，不是置信区间）。', 150, 640, 11.5, COL.muted, 'left');
   }
 
-  /* ---------- 章节 ---------- */
+  /* ---------- 6：总结 ---------- */
+  function draw6(tl) {
+    bg(); rollNumbers(tl, 16, 0.02);
+    txt('把整条链路串起来', 90, 90, 16, COL.gold, 'left', 600);
+    var chain = [
+      ['公式', 'z=(x−μ)/σ'], ['一个数', '2.04'], ['矩阵', '16×20 / 32×16'],
+      ['权重', 'W（32×16）'], ['激活', 'GELU'], ['编码器', '卷积+图'],
+      ['投影', '20→12'], ['输出', '12 步'], ['学习', '损失↓'], ['校准', 'α=0.25']
+    ];
+    var prog = clamp(tl / 9, 0, 1);
+    chain.forEach(function (c, i) {
+      var a = clamp(prog * chain.length - i, 0, 1);
+      var x = 80 + i * 128, y = 300;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = i % 2 ? 'rgba(56,189,248,0.18)' : 'rgba(244,185,66,0.16)';
+      ctx.strokeStyle = 'rgba(148,197,255,0.4)';
+      roundRect(x, y - 40, 116, 90, 10); ctx.fill(); ctx.stroke();
+      txt(c[0], x + 58, y - 12, 12, COL.muted, 'center');
+      txt(c[1], x + 58, y + 24, 12.5, '#eaf3ff', 'center', 600);
+      if (i < chain.length - 1) {
+        ctx.beginPath(); ctx.moveTo(x + 116, y); ctx.lineTo(x + 128, y); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    });
+    txt('数据从头到尾：原始计数 → 平滑 → 标准化 → 矩阵 → 编码器 → 学习 → 预测 → 校准', 90, 470, 14, '#eaf3ff', 'left');
+    txt('视频里的每个数字都来自真实产物；每一条公式都在页面字幕中排版呈现。', 90, 505, 12, COL.muted, 'left');
+    txt('WMEG-Net · 山西 11 市 · 15,385 参数 · 4:30', W / 2, 650, 15, COL.gold, 'center', 600);
+  }
+
   var CH_META = [
-    { start: 0, end: 15, name: '0 · 一个样本 / 一个 batch', draw: drawIntro, steps: [
-      { at: 0, ttl: '先看单位：一个样本', txt: '一个样本 = 连续 20 天 × 11 个城市 × 16 个通道；训练时一次拿 32 个样本组成一个 batch。', tex: '\\mathbf{x}\\in\\mathbb{R}^{20\\times11\\times16},\\quad \\mathbf{X}\\in\\mathbb{R}^{32\\times20\\times11\\times16}' },
-      { at: 8, ttl: '讲解样本', txt: '我们锁定 batch 里的第 1 个样本：太原，输入 2019-11-27 ~ 12-16，标签是之后 12 天。', tex: '\\mathbf{y}\\in\\mathbb{R}^{32\\times11\\times12}' }
+    { start: 0, end: 20, name: '0 · 一个公式，一个数', draw: draw0, steps: [
+      { at: 0, ttl: '先把公式写出来', txt: '标准化公式把平滑病例变成标准分；公式不是摆设，它下面要代入真实数字。', sub: '标准化公式：z 等于（x 减 μ）除以 σ。', tex: 'z=\\frac{x-\\mu}{\\sigma}' },
+      { at: 6, ttl: '代入真实数字', txt: 'x 是 12-16 的平滑病例 6.29，μ=1.20、σ=2.49 来自训练段——算出来是 2.04。', sub: '代入：6.29 减 1.20，再除以 2.49，得到 2.04。', tex: 'z=\\frac{6.29-1.20}{2.49}=2.04' },
+      { at: 14, ttl: '这个数进入矩阵', txt: '2.04 会落进矩阵的一个格子，然后进入编码器。', sub: '这个 2.04，会落进矩阵的一个格子。', tex: '2.04\\rightarrow \\mathbf{X}_{20,1}' }
     ] },
-    { start: 15, end: 65, name: '1 · 平滑：公式与计算', draw: drawSmooth, steps: [
-      { at: 0, ttl: '原始计数', txt: '太原这 20 天的每日报告数：有尖刺、有 0 值。直接拿它当输入，噪声会主导学习。', tex: 'y_t\\;\\text{（t = 2019-11-27 … 12-16）}' },
-      { at: 8, ttl: '7 日平移平均', txt: '用过去 7 天（含当天）的算术平均做平滑；它只看历史，不会泄漏未来。', tex: '\\bar y_t=\\frac{1}{7}\\sum_{k=0}^{6}y_{t-k}' },
-      { at: 22, ttl: '代入数字', txt: '把最后一天 12-16 及其前 6 天的真实报告数代入公式，求和再除以 7，得到这一天的平滑值。',
-        tex: function () { var ex = EX.example; var parts = ex.raw7.map(function (v) { return fmt(v, 1); });
-          return '\\bar y_{2019\\text{-}12\\text{-}16}=\\frac{' + parts.join('+') + '}{7}=' + fmt(ex.mean7, 2); } },
-      { at: 36, ttl: '得到平滑序列', txt: '对每天重复这一操作，就得到右图的平滑序列；窗口不足 7 天的前 6 天记为 NaN。', tex: '\\{\\bar y_t\\}_{t=7}^{T}' }
+    { start: 20, end: 70, name: '1 · 滚动求和：得到平滑数据', draw: draw1, steps: [
+      { at: 0, ttl: '7 天滚动窗口', txt: '窗口每移动一天，就重算一次 7 天平均；这个过程会重复 20 次。', sub: '一个 7 天的窗口，每天滚动一次。', tex: '\\bar y_t=\\frac{1}{7}\\sum_{k=0}^{6}y_{t-k}' },
+      { at: 20, ttl: '代入并除', txt: '把 12-10 到 12-16 的真实报告数相加得到 44，再除以 7：6.29。', sub: '7 个数相加是 44，再除以 7，等于 6.29。', tex: '\\bar y_{2019-12-16}=\\frac{9+11+4+3+4+7+6}{7}=6.29' },
+      { at: 34, ttl: '再把 6.29 标准化', txt: '标准化后得到 2.04；这个数将作为矩阵第一列（病例通道）进入网络。', sub: '再把 6.29 标准化成 2.04，这就是输入向量里的第一个数。', tex: 'z=\\frac{6.29-1.20}{2.49}=2.04' }
     ] },
-    { start: 65, end: 110, name: '2 · 气象：去季节与标准化', draw: drawWeather, steps: [
-      { at: 0, ttl: '气象先去掉季节', txt: '温度、湿度有明显的年周期；直接用原始值，模型会把"冬天"误当成"气象异常"。', tex: 'a_t=x_t-c(d_t),\\quad c(d)=\\text{2015–18 同日序均值}' },
-      { at: 10, ttl: '再按训练段标准化', txt: 'μ、σ 只从训练段估计；标准化后不同城市/量纲才可比。', tex: 'z_t=\\frac{x_t-\\mu}{\\sigma}' },
-      { at: 22, ttl: '这一天的一行', txt: '病例 z、温度距平、湿度距平、降水 z，再加 12 个日历谐波，拼成 16 维行向量。', tex: '\\mathbf{x}_t\\in\\mathbb{R}^{16}' }
+    { start: 70, end: 115, name: '2 · 矩阵：数据变成矩阵', draw: draw2, steps: [
+      { at: 0, ttl: '16×20 输入矩阵', txt: '20 天 × 16 通道逐格滚入；每一格都是真实数值。', sub: '这一天、每一个通道的值，逐格填进 16×20 的输入矩阵。', tex: '\\mathbf{X}\\in\\mathbb{R}^{20\\times16}' },
+      { at: 20, ttl: '32×16 batch 矩阵', txt: '32 个样本各取窗口最后一天，得到 32×16 的 batch 视图；第一格就是 2.04。', sub: '32 个样本排成 32 行，每行 16 个特征；第一格还是 2.04。', tex: '\\mathbf{X}_{\\mathrm{batch}}\\in\\mathbb{R}^{32\\times16}' },
+      { at: 36, ttl: '32×16 权重矩阵', txt: '这是编码器要学习的参数矩阵：32 个特征 × 16 个输入通道；高亮第 11 行。', sub: '权重矩阵是 32 行 16 列；我们盯着第 11 行。', tex: '\\mathbf{W}\\in\\mathbb{R}^{32\\times16}' }
     ] },
-    { start: 110, end: 160, name: '3 · 输入矩阵画出来', draw: drawMatrixScene, steps: [
-      { at: 0, ttl: '20 天 × 16 通道的矩阵', txt: '这就是进入编码器的矩阵：每一行是一天，每一列是一个通道；格子里的数字是真实值（保留两位小数）。', tex: '\\mathbf{X}^{(\\text{太原})}\\in\\mathbb{R}^{20\\times16}' },
-      { at: 12, ttl: '11 个城市各有一张', txt: '每个城市都有自己的 20×16 矩阵；把 11 个城市并排，就是 20×11×16 的样本张量。', tex: '\\mathbf{X}\\in\\mathbb{R}^{20\\times11\\times16}' },
-      { at: 24, ttl: '再叠成 batch', txt: '32 个样本叠起来才是训练时真正喂给网络的一个 batch。', tex: '\\mathbf{X}\\in\\mathbb{R}^{32\\times20\\times11\\times16}' }
+    { start: 115, end: 170, name: '3 · 一个数字穿过编码器', draw: draw3, steps: [
+      { at: 0, ttl: '点积：16 次乘加', txt: '输入向量与第 11 行的 16 个权重逐一相乘，再相加，加上偏置，得到净输入 pre。', sub: '16 个输入分别乘 16 个权重，相加，再加偏置。', tex: '\\mathrm{pre}=\\sum_{c=1}^{16}x_c w_{11,c}+b_{11}' },
+      { at: 22, ttl: 'GELU 激活', txt: '激活函数把 pre 变成非线性响应：这里是 0.733 变成 -0.120（训练后）。', sub: 'GELU 把净输入 0.33 变成 0.12，方向都变了。', tex: '\\mathrm{GELU}(z)=0.5z\\left(1+\\tanh\\left(\\sqrt{2/\\pi}(z+0.044715z^3)\\right)\\right)' },
+      { at: 34, ttl: '继续往后走', txt: '编码器/图/时间投影逐步更新这个特征值：-0.332 → 0.639 → 输出 6.565。', sub: '同一个特征值继续被编码器、图和投影改写，最后变成预测。', tex: '\\hat y=f_\\theta(\\mathbf{X})' }
     ] },
-    { start: 160, end: 240, name: '4 · 矩阵进入编码器', draw: drawEncoder, steps: [
-      { at: 0, ttl: '因果卷积（矩阵形式）', txt: '用移位矩阵把过去的值移到当前位置，再乘可学习的权重；右侧未来被遮住。', tex: '\\mathbf{H}^{(d)}=\\sigma\\big(\\sum_{m=0}^{K-1}\\mathbf{S}_{d\\,m}\\mathbf{X}\\mathbf{W}_m\\big)' },
-      { at: 34, ttl: '城际图', txt: '11 个城市、19 条接壤边；每个城市聚合邻居表示。C 行随机、准静态，是结构先验而非实时流量。', tex: "\\mathbf{h}'_i=\\sum_{j\\in\\mathcal{N}(i)}C_{ij}\\mathbf{h}_j" },
-      { at: 58, ttl: '时间投影与双头', txt: '20 个时间步压到 12 个预测步；直接头输出病例，机理头只在训练时作为辅助正则。', tex: '\\hat{\\mathbf{y}}=\\mathbf{W}_{\\mathrm{out}}\\,\\mathrm{vec}(\\mathbf{H}_{12})' }
+    { start: 170, end: 215, name: '4 · 学习：权重怎么变', draw: draw4, steps: [
+      { at: 0, ttl: '初始化 vs 训练后', txt: '左：随机初始化；右：训练后的 32×16 权重矩阵；第 11 行用金色高亮。', sub: '同一个权重矩阵，训练前是随机的，训练后变了。', tex: '\\mathbf{W}^{(0)}\\rightarrow\\mathbf{W}^{(T)}' },
+      { at: 12, ttl: '一个权重的例子', txt: '第 11 行第 1 个权重、净输入 pre、GELU 值都在变：学习就是在改这些数。', sub: '权重、净输入、激活值都在变化，这就是学习。', tex: 'w_{11,1}:\\ 0.117\\rightarrow ?' },
+      { at: 26, ttl: '输出也变了', txt: '训练前输出 6.66，训练后 6.57；整条 12 步曲线更贴合真实走势。', sub: '学习之后，12 步预测曲线从平变陡，更接近真实。', tex: '\\hat{\\mathbf{y}}^{(0)}\\rightarrow\\hat{\\mathbf{y}}^{(T)}' }
     ] },
-    { start: 240, end: 272, name: '5 · 训练', draw: drawTraining, steps: [
-      { at: 0, ttl: '最小化误差', txt: '在 1,213 个训练窗口上最小化预测误差；验证集用于早停，测试段从不参与训练。', tex: '\\mathcal{L}=\\frac{1}{32\\cdot11\\cdot12}\\sum(\\hat y-y)^2+\\lambda_{\\mathrm{aux}}\\mathcal{L}_{\\mathrm{mech}}' },
-      { at: 12, ttl: '损失下降与集成', txt: '验证损失在前几十个 epoch 快速下降；15 个随机种子取平均降低方差。', tex: '\\hat{\\mathbf{y}}^{\\mathrm{ens}}=\\frac{1}{15}\\sum_{s=1}^{15}\\hat{\\mathbf{y}}_s' }
+    { start: 215, end: 245, name: '5 · 15 个种子：学习曲线', draw: draw5, steps: [
+      { at: 0, ttl: '损失下降', txt: '15 个种子的验证损失都在下降；每个种子都从不同初始化出发。', sub: '15 个种子，各自从随机初始化开始，损失都在下降。', tex: '\\mathcal{L}(\\theta)\\downarrow' },
+      { at: 12, ttl: '集成与指标', txt: '15 个模型平均后，测试 RMSE 2.1611；校准后 2.0125，低于持续性基线 2.1225。', sub: '15 个模型取平均，校准后误差低于持续性基线。', tex: '\\hat{\\mathbf{y}}^{\\mathrm{ens}}=\\frac{1}{15}\\sum_s\\hat{\\mathbf{y}}_s' }
     ] },
-    { start: 272, end: 300, name: '6 · 预测与校准', draw: drawEval, steps: [
-      { at: 0, ttl: '这个样本的 12 步预测', txt: '集成预测约 6 例/日，真实升到 12 例/日——节假日陡升被低估，这是模型的真实边界。', tex: '\\hat{\\mathbf{y}}=[\\hat y_{t+1},\\ldots,\\hat y_{t+12}]' },
-      { at: 12, ttl: '校准与整体指标', txt: '测试段整体 RMSE 2.1611；α=0.25 收缩校准后 2.0125，低于持续性基线 2.1225。', tex: '\\hat y^{\\mathrm{cal}}=y_{\\mathrm{last}}+\\alpha(\\hat y-y_{\\mathrm{last}})' }
+    { start: 245, end: 270, name: '6 · 总结', draw: draw6, steps: [
+      { at: 0, ttl: '一条链路', txt: '公式 → 一个数 → 矩阵 → 权重 → 激活 → 编码器 → 投影 → 输出 → 学习 → 校准。', sub: '这就是一个数字的完整旅程，也是模型学习的全部过程。', tex: '' }
     ] }
   ];
 
@@ -574,8 +503,7 @@
     var cap = document.getElementById('caption');
     cap.querySelector('.ttl').textContent = step.ttl;
     cap.querySelector('.txt').textContent = step.txt;
-    var ftex = (typeof step.tex === 'function') ? step.tex() : (step.tex || '');
-    cap.querySelector('.fml').innerHTML = ftex ? tex(ftex) : '';
+    cap.querySelector('.fml').innerHTML = step.tex ? tex(step.tex) : '';
     var chs = document.querySelectorAll('#chapters .ch');
     for (var j = 0; j < chs.length; j++) chs[j].classList.toggle('on', j === i);
   }
@@ -583,13 +511,13 @@
     var i = chapterAt(T), c = CH[i];
     ctx.clearRect(0, 0, W, H);
     c.draw(T - c.start);
-    ctx.fillStyle = 'rgba(5,10,18,0.72)'; roundRect(18, 16, 344, 38, 9); ctx.fill();
-    txt(c.name, 34, 36, 14, COL.gold, 'left', 600);
-    ctx.fillStyle = 'rgba(5,10,18,0.72)'; ctx.fillRect(0, H - 42, W, 42);
+    ctx.fillStyle = 'rgba(5,10,18,0.72)'; roundRect(18, 14, 360, 36, 9); ctx.fill();
+    txt(c.name, 34, 32, 13.5, COL.gold, 'left', 600);
+    ctx.fillStyle = 'rgba(5,10,18,0.72)'; ctx.fillRect(0, H - 40, W, 40);
     ctx.fillStyle = 'rgba(148,163,184,0.4)'; ctx.fillRect(0, H - 3, W, 3);
     ctx.fillStyle = COL.gold; ctx.fillRect(0, H - 3, W * (T / DUR), 3);
-    txt('真实数据样本 · 5:00 · 一个样本的旅程', 18, H - 22, 10.5, COL.muted, 'left');
-    txt('WMEG-Net · 15,385 参数', W - 18, H - 22, 10.5, COL.muted, 'right');
+    txt('真实数据 · 4:30 · 一个数字的旅程', 18, H - 21, 10.5, COL.muted, 'left');
+    txt('WMEG-Net · 15,385 参数', W - 18, H - 21, 10.5, COL.muted, 'right');
     updateCaption(T);
     document.getElementById('time').textContent = fmtTime(T) + ' / ' + fmtTime(DUR);
     document.getElementById('range').value = T;
@@ -625,10 +553,11 @@
   function load() {
     Promise.all([
       fetch('data/explain_data.json').then(function (r) { return r.json(); }),
+      fetch('data/journey_data.json').then(function (r) { return r.json(); }),
       fetch('data/app_data.json').then(function (r) { return r.json(); }),
       fetch('data/geo.json').then(function (r) { return r.json(); })
     ]).then(function (arr) {
-      EX = arr[0]; APP = arr[1]; GEO = arr[2];
+      EX = arr[0]; JR = arr[1]; APP = arr[2]; GEO = arr[3];
       CITYMETA = APP.meta.cities.map(function (c) { return { name: c.name, short: c.short, lon: c.lon, lat: c.lat, neighbors: c.neighbors }; });
       CH = CH_META.map(function (c) { return c; });
       if (RECORD) document.body.classList.add('record');
@@ -640,16 +569,13 @@
         seek: function (t) { playing = false; T = clamp(t, 0, DUR); lastCaptionKey = ''; render(); },
         captions: function () {
           var out = [];
-          CH.forEach(function (c) { c.steps.forEach(function (s) {
-            var st = (typeof s.tex === 'function') ? s.tex() : (s.tex || '');
-            out.push({ t: c.start + s.at, ttl: s.ttl, txt: s.txt, tex: st });
-          }); });
+          CH.forEach(function (c) { c.steps.forEach(function (s) { out.push({ t: c.start + s.at, ttl: s.ttl, sub: s.sub || s.txt }); }); });
           return out;
         }
       };
       if (!RECORD) requestAnimationFrame(tick);
     }).catch(function (e) {
-      document.getElementById('caption').querySelector('.txt').textContent = '数据加载失败：' + e + '（请通过本地服务器打开）';
+      document.getElementById('caption').querySelector('.txt').textContent = '数据加载失败：' + e;
     });
   }
   function init() {
