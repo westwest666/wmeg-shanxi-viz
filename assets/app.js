@@ -3,7 +3,7 @@
    WMEG-Net 山西省可视化 · 单页应用
    数据：data/app_data.json（原始病例/平滑病例/气象）、data/geo.json（行政边界）
    ============================================================ */
-var DATA = null, GEO = null;
+var DATA = null, GEO = null, FIT = null;
 var CITY = {};            // name -> meta city
 var SERIES = {};          // name -> series
 var state = {
@@ -212,7 +212,7 @@ function renderChart(container, cfg) {
   if (cfg.window && cfg.window.length === 2) {
     var wx0 = x(cfg.window[0]), wx1 = x(cfg.window[1]);
     svg.appendChild(sEl('rect', { x: wx0, y: m.t, width: Math.max(1, wx1 - wx0), height: plotH, fill: 'rgba(250,204,21,0.10)', stroke: 'rgba(250,204,21,0.45)', 'stroke-dasharray': '3 3' }));
-    var wl = sEl('text', { x: wx0 + 4, y: m.t + 12, 'font-size': 10, fill: '#eab308' });
+    var wl = sEl('text', { x: wx0 + 4, y: m.t + plotH - 6, 'font-size': 10, fill: '#eab308' });
     wl.textContent = '输入窗口 20 天';
     svg.appendChild(wl);
   }
@@ -342,6 +342,7 @@ function tick(ts) {
   }
   drawMapWeather(ts);
   drawCityWeather(ts);
+  if (typeof draw3D === 'function') draw3D(ts);
   requestAnimationFrame(tick);
 }
 
@@ -380,6 +381,7 @@ function boot() {
     var qm = qs.get('mode');
     if (qm === 'cases' || qm === 'precip' || qm === 'tavg' || qm === 'rh') state.mode = qm;
     if (qs.get('view') === 'network') state.view = 'network';
+    if (qs.get('view') === '3d') state.view = '3d';
     if (qs.get('edges') === '0') state.edges = false;
     if (qs.get('play') === '1') state.playing = true;
     if (qs.get('city')) location.hash = '#/city/' + encodeURIComponent(shortToFull(qs.get('city')));
@@ -392,9 +394,10 @@ function boot() {
 window.addEventListener('DOMContentLoaded', function () {
   Promise.all([
     fetch('data/app_data.json').then(function (r) { return r.json(); }),
-    fetch('data/geo.json').then(function (r) { return r.json(); })
+    fetch('data/geo.json').then(function (r) { return r.json(); }),
+    fetch('data/fit_data.json').then(function (r) { return r.json(); })
   ]).then(function (arr) {
-    DATA = arr[0]; GEO = arr[1];
+    DATA = arr[0]; GEO = arr[1]; FIT = arr[2];
     boot();
   }).catch(function (err) {
     $('#page').innerHTML = '<div class="errbox">数据加载失败：' + err + '\n请用本地服务器打开（例如在 08_可视化网站 目录运行 python -m http.server 8788）。</div>';
@@ -419,7 +422,8 @@ function modeButtons() {
 function viewButtons() {
   return '<span class="muted small" style="margin-left:8px">视图</span>' +
     '<button class="btn' + (state.view === 'map' ? ' active' : '') + '" data-view="map">地图</button>' +
-    '<button class="btn' + (state.view === 'network' ? ' active' : '') + '" data-view="network">网络</button>';
+    '<button class="btn' + (state.view === 'network' ? ' active' : '') + '" data-view="network">网络</button>' +
+    '<button class="btn' + (state.view === '3d' ? ' active' : '') + '" data-view="3d">3D 立体</button>';
 }
 function renderOverview() {
   var page = $('#page');
@@ -440,6 +444,15 @@ function renderOverview() {
           '<div class="chart-legend" id="ov-chart-legend"></div>' +
           '<div class="chart-wrap" id="ov-chart"></div>' +
         '</div>' +
+        '<div class="panel" style="margin-top:16px">' +
+          '<h2>模型拟合（测试集） <span class="sub">15 种子集成 · 逐日预测 vs 真实 + 逐步长 RMSE</span></h2>' +
+          '<div class="chart-legend" id="ov-fit-legend"></div><div class="chart-wrap" id="ov-fit-chart"></div>' +
+          '<div class="cards" id="ov-fit-cards" style="margin-top:10px"></div>' +
+          '<div class="chart-legend" style="margin-top:12px">逐步长 RMSE（第 1–12 步，测试集）</div><div class="chart-wrap" id="ov-horizon-chart"></div>' +
+          '<div style="overflow:auto;margin-top:10px"><table class="city-table"><thead><tr>' +
+            '<th>城市</th><th>RMSE</th><th>PCC</th><th>第 1 步</th><th>第 12 步</th>' +
+          '</tr></thead><tbody id="ov-fit-tbody"></tbody></table></div>' +
+        '</div>' +
       '</div>' +
       '<div>' +
         '<div class="cards" id="ov-cards"></div>' +
@@ -455,6 +468,8 @@ function renderOverview() {
   refs.chart = $('#ov-chart'); refs.legendName = $('#ov-legend-name'); refs.legendRange = $('#ov-legend-range');
   refs.animLegend = $('#ov-anim-legend'); refs.sub = $('#ov-sub'); refs.note = $('#ov-note');
   refs.winSub = $('#ov-win-sub'); refs.chartLegend = $('#ov-chart-legend');
+  refs.fitChart = $('#ov-fit-chart'); refs.fitLegend = $('#ov-fit-legend');
+  refs.fitCards = $('#ov-fit-cards'); refs.fitHorizon = $('#ov-horizon-chart'); refs.fitTbody = $('#ov-fit-tbody');
   $('#ov-tools').addEventListener('click', function (ev) {
     var b = ev.target.closest('button[data-mode]');
     if (b) { state.mode = b.getAttribute('data-mode'); renderOverview(); return; }
@@ -476,7 +491,7 @@ function renderOverview() {
   });
   lg += '</div><div class="small muted" style="margin-top:8px">城市页的雨滴数量 = clamp(降水 × 强度映射, 0, 600)，气温越低转为雪，湿度越高雾越浓。</div>';
   refs.animLegend.innerHTML = lg;
-  if (state.view === 'map') buildMap(); else buildNetwork();
+  if (state.view === 'map') buildMap(); else if (state.view === 'network') buildNetwork(); else build3D();
   updateOverviewDynamic();
 }
 function buildMap() {
@@ -588,7 +603,7 @@ function buildNetwork() {
   });
 }
 function updateOverviewDynamic() {
-  if (!refs.paths && !refs.nodes) return;
+  if (!refs.paths && !refs.nodes && !refs.threeCanvas) return;
   var i = state.idx;
   var mode = state.mode;
   // 地图颜色/标签
@@ -667,6 +682,8 @@ function updateOverviewDynamic() {
   // 动画说明
   var lv = rainLevel(maxP.v);
   refs.note.textContent = '当日全省最大降水：' + (maxP.v > 0 ? (maxP.c + ' ' + fmt(maxP.v, 1) + ' mm（' + RAIN_LEVELS[lv].name + '）') : '无');
+  if (typeof renderFitOverview === 'function') renderFitOverview();
+  if (state.view === '3d' && refs.note) refs.note.textContent = '3D 立体：柱高 = ' + modeName(mode) + ' · 拖动旋转 · 滚轮缩放 · 点击城市进入';
 }
 function card(k, v, sub) {
   return '<div class="card"><div class="k">' + k + (sub ? ' · ' + sub : '') + '</div><div class="v">' + v + '</div></div>';
@@ -714,6 +731,11 @@ function renderCity(name) {
           '<div class="tools"><button class="btn" data-range="90">90 天</button><button class="btn' + (state.ctxRange === 120 ? ' active' : '') + '" data-range="120">120 天</button><button class="btn' + (state.ctxRange === 240 ? ' active' : '') + '" data-range="240">240 天</button></div>' +
           '<div class="chart-legend" id="ctx-legend"></div><div class="chart-wrap" id="chart-context"></div>' +
         '</div>' +
+        '<div class="panel" style="margin-top:16px"><h2>模型拟合（测试集） <span class="sub" id="fit-sub"></span></h2>' +
+          '<div class="chart-legend" id="fit-legend"></div><div class="chart-wrap" id="chart-fit"></div>' +
+          '<div class="cards" id="fit-cards" style="margin-top:10px"></div>' +
+          '<div class="chart-legend" style="margin-top:12px">逐步长 RMSE：本城 vs 全省</div><div class="chart-wrap" id="chart-fit-horizon"></div>' +
+        '</div>' +
         '<div class="panel" style="margin-top:16px"><h2>城市信息</h2><div id="city-info"></div></div>' +
       '</div>' +
     '</div>';
@@ -725,6 +747,8 @@ function renderCity(name) {
   refs.tbody = $('#window-tbody'); refs.sky = $('#sky-canvas');
   refs.skyT = $('#sky-t'); refs.skyD = $('#sky-d'); refs.skyNotes = $('#sky-notes');
   refs.skyInt = $('#sky-intensity'); refs.skySub = $('#sky-sub'); refs.cityInfo = $('#city-info');
+  refs.fitChart = $('#chart-fit'); refs.fitLegend = $('#fit-legend'); refs.fitCards = $('#fit-cards');
+  refs.fitHorizon = $('#chart-fit-horizon'); refs.fitSub = $('#fit-sub');
   var nh = '';
   c.neighbors.forEach(function (n) { nh += '<span class="chip" data-city="' + n + '">' + n + '</span>'; });
   refs.neighbors.innerHTML = '<span class="small muted">接壤：</span>' + nh;
@@ -830,6 +854,7 @@ function updateCityDynamic() {
     sel: cdates.length - 1,
     tip: function (k) { return '<b>' + cdates[k] + '</b><br/>原始 ' + fmtInt(craw[k]) + ' 例<br/>平滑 ' + fmt(csm[k], 1) + ' 例'; }
   });
+  if (typeof renderFitCity === 'function') renderFitCity(name);
 }
 
 /* ---------- 天气动画：城市 ---------- */
@@ -1000,3 +1025,82 @@ function drawMapWeather(ts) {
   });
 }
 
+/* ---------- 模型拟合（测试集） ---------- */
+function fitTestIdx(d) { if (!FIT) return null; var k = FIT.testDates.indexOf(d); return k >= 0 ? k : null; }
+function renderFitOverview() {
+  if (!FIT || !refs.fitChart) return;
+  var dates = FIT.testDates.slice();
+  var truth = FIT.province.true, pred = FIT.province.pred;
+  refs.fitLegend.innerHTML = '<span><i style="background:#cbd5e1"></i>真实（多窗口平均）</span><span><i style="background:#4ade80"></i>15 种子集成预测</span>';
+  renderChart(refs.fitChart, {
+    dates: dates, width: 980, height: 210, yFmt: function (v) { return fmt(v, 0); },
+    series: [
+      { type: 'line', data: truth, color: '#cbd5e1', width: 1.5 },
+      { type: 'line', data: pred, color: '#4ade80', width: 2.1 }
+    ],
+    sel: fitTestIdx(dateAt(state.idx)),
+    tip: function (k) { return '<b>' + dates[k] + '</b><br/>真实 ' + fmt(truth[k], 1) + ' 例<br/>预测 ' + fmt(pred[k], 1) + ' 例'; }
+  });
+  var m = FIT.metrics.province, bl = FIT.baselines;
+  refs.fitCards.innerHTML =
+    card('总体 RMSE', fmt(m.allRmse, 4)) +
+    card('总体 PCC', fmt(m.allPcc, 3)) +
+    card('第 1 步 RMSE', fmt(m.rmseH[0], 3)) +
+    card('第 12 步 RMSE', fmt(m.rmseH[11], 3)) +
+    card('持续性基线', fmt(bl.persistence, 4), '原始模型 +1.82%') +
+    card('校准后（α=0.25）', fmt(bl.calibratedGlobal, 4), '相对原始 −6.88%');
+  var hDates = []; for (var h = 1; h <= 12; h++) hDates.push(h + ' 步');
+  renderChart(refs.fitHorizon, {
+    dates: hDates, width: 980, height: 170, xFmt: function (d) { return d; }, yFmt: function (v) { return fmt(v, 1); },
+    series: [{ type: 'bar', data: m.rmseH, color: 'rgba(96,165,250,.7)' }],
+    tip: function (k) { return '第 ' + (k + 1) + ' 步<br/>RMSE ' + fmt(m.rmseH[k], 3); }
+  });
+  var rows = [];
+  DATA.meta.cities.forEach(function (c) {
+    var cm = FIT.metrics.cities[c.name];
+    if (cm) rows.push({ name: c.name, short: c.short, v: cm });
+  });
+  rows.sort(function (a, b) { return a.v.allRmse - b.v.allRmse; });
+  var html = '';
+  rows.forEach(function (r) {
+    html += '<tr data-city="' + r.name + '"><td>' + r.short + '</td><td>' + fmt(r.v.allRmse, 3) + '</td><td>' + fmt(r.v.allPcc, 3) + '</td><td>' + fmt(r.v.rmseH[0], 3) + '</td><td>' + fmt(r.v.rmseH[11], 3) + '</td></tr>';
+  });
+  refs.fitTbody.innerHTML = html;
+  refs.fitTbody.onclick = function (ev) {
+    var tr = ev.target.closest('tr');
+    if (tr && tr.getAttribute('data-city')) location.hash = '#/city/' + encodeURIComponent(tr.getAttribute('data-city'));
+  };
+}
+function renderFitCity(name) {
+  if (!FIT || !refs.fitChart || !FIT.series[name]) return;
+  var dates = FIT.testDates.slice();
+  var truth = FIT.series[name].true, pred = FIT.series[name].pred;
+  var cm = FIT.metrics.cities[name], pm = FIT.metrics.province;
+  refs.fitLegend.innerHTML = '<span><i style="background:#cbd5e1"></i>真实</span><span><i style="background:#4ade80"></i>集成预测</span>';
+  renderChart(refs.fitChart, {
+    dates: dates, width: 520, height: 210, yFmt: function (v) { return fmt(v, 0); },
+    series: [
+      { type: 'line', data: truth, color: '#cbd5e1', width: 1.5 },
+      { type: 'line', data: pred, color: '#4ade80', width: 2.1 }
+    ],
+    sel: fitTestIdx(dateAt(state.idx)),
+    tip: function (k) { return '<b>' + dates[k] + '</b><br/>真实 ' + fmt(truth[k], 1) + ' 例<br/>预测 ' + fmt(pred[k], 1) + ' 例'; }
+  });
+  refs.fitCards.innerHTML =
+    card('本城 RMSE', fmt(cm.allRmse, 3)) +
+    card('本城 PCC', fmt(cm.allPcc, 3)) +
+    card('第 1 步 RMSE', fmt(cm.rmseH[0], 3)) +
+    card('第 12 步 RMSE', fmt(cm.rmseH[11], 3)) +
+    card('相对全省', (cm.allRmse <= pm.allRmse ? '−' : '+') + fmt(Math.abs(cm.allRmse - pm.allRmse), 3), '全省 ' + fmt(pm.allRmse, 3)) +
+    card('第 6 步 PCC', fmt(cm.pccH[5], 3));
+  var hDates = []; for (var h = 1; h <= 12; h++) hDates.push(h + ' 步');
+  renderChart(refs.fitHorizon, {
+    dates: hDates, width: 520, height: 180, xFmt: function (d) { return d; }, yFmt: function (v) { return fmt(v, 2); },
+    series: [
+      { type: 'bar', data: cm.rmseH, color: 'rgba(96,165,250,.65)' },
+      { type: 'line', data: pm.rmseH, color: '#f472b6', width: 2, dash: '4 3' }
+    ],
+    tip: function (k) { return '第 ' + (k + 1) + ' 步<br/>本城 ' + fmt(cm.rmseH[k], 3) + ' · 全省 ' + fmt(pm.rmseH[k], 3); }
+  });
+  refs.fitSub.textContent = '测试集 2018-12-23 ~ 2019-12-31 · 逐日多窗口平均';
+}
