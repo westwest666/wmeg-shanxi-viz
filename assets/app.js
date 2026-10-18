@@ -3,7 +3,7 @@
    WMEG-Net 山西省可视化 · 单页应用
    数据：data/app_data.json（原始病例/平滑病例/气象）、data/geo.json（行政边界）
    ============================================================ */
-var DATA = null, GEO = null, FIT = null;
+var DATA = null, GEO = null, FIT = null, MECH = null, V2X = null;
 var CITY = {};            // name -> meta city
 var SERIES = {};          // name -> series
 var state = {
@@ -177,6 +177,11 @@ function renderChart(container, cfg) {
   // 值域
   var vals = [];
   (cfg.series || []).forEach(function (s) {
+    if (s.type === 'band') {
+      (s.upper || []).forEach(function (v) { if (v !== null && v !== undefined && !isNaN(v)) vals.push(v); });
+      (s.lower || []).forEach(function (v) { if (v !== null && v !== undefined && !isNaN(v)) vals.push(v); });
+      return;
+    }
     (s.data || []).forEach(function (v) { if (v !== null && v !== undefined && !isNaN(v)) vals.push(v); });
   });
   if (!vals.length) return;
@@ -226,6 +231,20 @@ function renderChart(container, cfg) {
         var hgt = Math.max(0, m.t + plotH - yy);
         svg.appendChild(sEl('rect', { x: x(i) - bw / 2, y: yy, width: bw, height: hgt, fill: s.color, rx: Math.min(2, bw / 2) }));
       });
+    } else if (s.type === 'band') {
+      var up = '', lo = '', startedB = false;
+      for (var bi = 0; bi < n; bi++) {
+        var uv = s.upper[bi], lv = s.lower[bi];
+        if (uv === null || uv === undefined || isNaN(uv) || lv === null || lv === undefined || isNaN(lv)) continue;
+        up += (startedB ? 'L' : 'M') + x(bi).toFixed(2) + ' ' + y(uv).toFixed(2) + ' ';
+        startedB = true;
+      }
+      for (var bj = n - 1; bj >= 0; bj--) {
+        var lv2 = s.lower[bj], uv2 = s.upper[bj];
+        if (lv2 === null || lv2 === undefined || isNaN(lv2) || uv2 === null || uv2 === undefined || isNaN(uv2)) continue;
+        lo += 'L' + x(bj).toFixed(2) + ' ' + y(lv2).toFixed(2) + ' ';
+      }
+      svg.appendChild(sEl('path', { d: up + lo + 'Z', fill: s.color, opacity: s.opacity || 0.25, stroke: 'none' }));
     } else {
       var d = '', started = false;
       s.data.forEach(function (v, i) {
@@ -374,7 +393,9 @@ function boot() {
   d.meta.cities.forEach(function (c) { CITY[c.name] = c; });
   buildGeo();
   buildTimebar();
-  var i = idxOf('2019-01-15'); state.idx = i >= 0 ? i : 0;
+  var _defaultDate = '2019-01-15';
+  if (V2X && V2X.province && V2X.province.peakDate) _defaultDate = V2X.province.peakDate;
+  var i = idxOf(_defaultDate); state.idx = i >= 0 ? i : 0;
   try {
     var qs = new URLSearchParams(location.search);
     if (qs.get('date')) { var qi = idxOf(qs.get('date')); if (qi >= 0) state.idx = qi; }
@@ -395,9 +416,11 @@ window.addEventListener('DOMContentLoaded', function () {
   Promise.all([
     fetch('data/app_data.json').then(function (r) { return r.json(); }),
     fetch('data/geo.json').then(function (r) { return r.json(); }),
-    fetch('data/fit_data.json').then(function (r) { return r.json(); })
+    fetch('data/fit_data.json').then(function (r) { return r.json(); }),
+    fetch('data/mech_data.json').then(function (r) { return r.json(); }),
+    fetch('data/viz_extra.json').then(function (r) { return r.json(); })
   ]).then(function (arr) {
-    DATA = arr[0]; GEO = arr[1]; FIT = arr[2];
+    DATA = arr[0]; GEO = arr[1]; FIT = arr[2]; MECH = arr[3]; V2X = arr[4];
     boot();
   }).catch(function (err) {
     $('#page').innerHTML = '<div class="errbox">数据加载失败：' + err + '\n请用本地服务器打开（例如在 08_可视化网站 目录运行 python -m http.server 8788）。</div>';
