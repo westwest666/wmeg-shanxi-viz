@@ -1,0 +1,179 @@
+1
+00:00:00,000 --> 00:00:03,200
+一条数据，能预测未来吗？
+Can one number predict the future?
+
+2
+00:00:03,200 --> 00:00:06,800
+2.04，一个标准化后的值。
+2.04 — a standardized value.
+
+3
+00:00:06,800 --> 00:00:09,600
+它凭什么预测未来？
+Why can it predict?
+
+4
+00:00:09,600 --> 00:00:18,000
+看它走过的每一步。
+Watch every step it takes.
+
+5
+00:00:18,000 --> 00:00:22,300
+1826 天，11 座城市。
+1,826 days. Eleven cities.
+
+6
+00:00:22,300 --> 00:00:25,500
+每天，用前 7 天做平均。
+Each day averages the last seven.
+
+7
+00:00:25,500 --> 00:00:29,100
+9+11+4+3+4+7+6 = 44。
+Nine plus eleven … equals 44.
+
+8
+00:00:29,100 --> 00:00:30,900
+44 ÷ 7 = 6.29。
+Forty-four over seven is 6.29.
+
+9
+00:00:30,900 --> 00:00:35,500
+再标准化：z = 2.04。
+Standardize: z equals 2.04.
+
+10
+00:00:35,500 --> 00:00:42,500
+16 个通道，拼成一行。
+Sixteen channels form one row.
+
+11
+00:00:42,500 --> 00:00:48,200
+20 天，就是一个矩阵。
+Twenty days become a matrix.
+
+12
+00:00:48,200 --> 00:00:53,200
+取最后一行：16 维输入。
+Take the last row: sixteen inputs.
+
+13
+00:00:53,200 --> 00:00:54,600
+权重矩阵：32 × 16。
+The weight matrix: 32 by 16.
+
+14
+00:00:54,600 --> 00:00:59,500
+取第 11 行：16 个权重。
+Take row eleven: sixteen weights.
+
+15
+00:00:59,500 --> 00:01:05,500
+16 次乘加 → pre。
+Sixteen multiply-adds give pre.
+
+16
+00:01:05,500 --> 00:01:10,500
+pre = −0.319。
+pre equals minus 0.319.
+
+17
+00:01:10,500 --> 00:01:17,200
+GELU 把 pre 变成 −0.120。
+GELU turns pre into minus 0.120.
+
+18
+00:01:17,200 --> 00:01:20,500
+编码器继续改写它。
+The encoder keeps rewriting it.
+
+19
+00:01:20,500 --> 00:01:23,500
+−0.332 → 0.639。
+Minus 0.332, then 0.639.
+
+20
+00:01:23,500 --> 00:01:28,500
+输出 6.57。
+Output: 6.57.
+
+21
+00:01:28,500 --> 00:01:31,500
+6.57 是怎么学会的？
+But how did it learn 6.57?
+
+22
+00:01:31,500 --> 00:01:35,000
+训练前，权重随机。
+Before training, the weights are random.
+
+23
+00:01:35,000 --> 00:01:38,000
+训练后，它们变了。
+After training, they have changed.
+
+24
+00:01:38,000 --> 00:01:41,200
+15 个种子，各自学习。
+Fifteen seeds, each learning.
+
+25
+00:01:41,200 --> 00:01:45,500
+损失一路下降。
+The loss keeps falling.
+
+26
+00:01:45,500 --> 00:01:52,500
+但等等——
+But wait.
+
+27
+00:01:52,500 --> 00:01:56,200
+模型 RMSE 2.1611。
+Model RMSE 2.1611.
+
+28
+00:01:56,200 --> 00:01:59,800
+仍比“照抄昨天”差 1.8%。
+Still 1.8% worse than persistence.
+
+29
+00:01:59,800 --> 00:02:03,500
+校准之后，2.0125。
+After calibration: 2.0125.
+
+30
+00:02:03,500 --> 00:02:07,000
+它失败在哪？
+Where does it fail?
+
+31
+00:02:07,000 --> 00:02:12,500
+假期陡升：预测 6，真实 12。
+Holiday surge: predicted 6, actual 12.
+
+32
+00:02:12,500 --> 00:02:16,000
+这不是 bug，是边界。
+Not a bug — a boundary.
+
+33
+00:02:16,000 --> 00:02:19,500
+15,385 个参数。
+15,385 parameters.
+
+34
+00:02:19,500 --> 00:02:25,000
+它学到的是结构先验。
+What it learned is a structural prior.
+
+35
+00:02:25,000 --> 00:02:28,000
+一个数字的旅程。
+The journey of one number.
+
+36
+00:02:28,000 --> 00:02:30,000
+数据、公式、矩阵、权重。
+Data, formulas, matrices, weights.
