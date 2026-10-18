@@ -22,20 +22,26 @@
   #poster h1{font-family:Georgia,"Times New Roman","SimSun",serif;font-weight:400;font-size:52px;letter-spacing:.06em;margin:0 0 12px;color:var(--ivory)}
   #poster p{font-family:Georgia,serif;font-style:italic;color:var(--dim);margin:0;font-size:16px;letter-spacing:.04em}
   body.record #ui, body.record #poster{display:none !important}
+  #fx{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(100vw,177.78vh);height:min(56.25vw,100vh);pointer-events:none;z-index:3}
+  #fx .item{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;color:#eaeaf2;text-shadow:0 2px 18px rgba(0,0,0,.6)}
+  #fx .item .katex{font-size:1em}
   body.record{overflow:hidden}
 </style>
 </head>
 <body>
-<div id="wrap"><canvas id="cv" width="1920" height="1080"></canvas></div>
+<div id="wrap"><canvas id="cv" width="1920" height="1080"></canvas>
+  <div id="fx"></div></div>
 <div id="poster"><div class="box"><div class="k">VIBE 知识大赏</div><h1>一个数字的旅程</h1><p>The Journey of a Number</p></div></div>
 <div id="ui">
   <button id="play">PLAY</button>
   <span class="t" id="time">0:00 / 2:30</span>
   <input type="range" id="range" min="0" max="150" step="0.1" value="0"/>
-  <a href="video/wmeg_vibe_2min30.mp4" download>MP4 ↓</a>
-  <a href="video/wmeg_vibe_2min30.srt" download>SRT ↓</a>
+  <a href="video/wmeg_vibe_2min30_v2.mp4" download>MP4 ↓</a>
+  <a href="video/wmeg_vibe_2min30_v2.srt" download>SRT ↓</a>
   <a href="index.html">← 返回</a>
 </div>
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css"/>
+<script src="assets/vendor/katex/katex.min.js"></script>
 <script src="assets/vibe.js"></script>
 </body>
 </html>
