@@ -134,6 +134,12 @@ select{font:inherit;font-size:11.5px;color:#cbd5e1;background:rgba(30,58,95,.32)
   #bar{flex-wrap:wrap;height:auto;bottom:8px;left:8px;right:8px}
   #title{left:8px;top:8px;right:8px;max-width:none}
 }
+/* ===== 嵌入模式（主站 iframe 使用；隐藏自带标题/控制条/图例，保留右上数据面板） ===== */
+body.embed #title, body.embed #bar, body.embed #help, body.embed #banner,
+body.embed #loading, body.embed #legend, body.embed #ridgePanel { display:none !important; }
+body.embed #stats{ right:12px; top:12px; min-width:196px; padding:9px 12px; }
+body.embed #stats .date{ font-size:21px; }
+body.embed #app{ position:absolute; inset:0; }
 </style>
 </head>
 <body>
@@ -1220,6 +1226,14 @@ function showError(msg){
   $('err').style.display='flex';
   $('loading').style.display='none';
 }
+var EMBED_MODE = /[?&]embed=1/.test(location.search);
+if (EMBED_MODE) document.body.classList.add('embed');
+window.addEventListener('message', function (e) {
+  var d = e.data || {};
+  if (d && d.type === 'setDay' && window.__proto3d) {
+    try { window.__proto3d.setDay(d.day); } catch (err) {}
+  }
+});
 function boot(){
   cacheDom();
   if(typeof THREE==='undefined'){
@@ -1258,7 +1272,10 @@ function boot(){
     requestAnimationFrame(loop);
     setInterval(hoverUpdate,110);
     window.__proto3d={ S:S, D:function(){ return D; }, G:G, camera:camera, scene:scene, project:projectPoint, THREE:THREE,
-      setDay:function(d){ S.target=S.day=clamp(d,0,D.ndays-1); setPlaying(false); S.lastRidgeDay=-99; updateHud(); drawRidge(); },
+      setDay:function(d){ d=clamp(d,0,D.ndays-1); S.target=S.day=d; setPlaying(false);
+        var di=Math.round(d);
+        if(di!==S._lastHudDay){ S._lastHudDay=di; updateHud();
+          if(di!==S.lastRidgeDay){ S.lastRidgeDay=-99; drawRidge(); } } },
       diag:function(){ var info=renderer?renderer.info.render:{triangles:0,calls:0};
         return { day:S.day, date:dateStr(S.day), real:D.real, nsamples:D.nsamples,
           cities:D.cities.length, tris:info.triangles, calls:info.calls, fps:S.fps,
@@ -1268,6 +1285,7 @@ function boot(){
           camera:[+camera.position.x.toFixed(1),+camera.position.y.toFixed(1),+camera.position.z.toFixed(1)] }; },
       setCam:function(az,el,dist){ S.camTween=null; S.az=az; S.el=el; S.dist=dist; }
     };
+    if (EMBED_MODE) { try { window.parent.postMessage({ type: 'cubeReady' }, '*'); } catch (e) {} }
   }).catch(function(err){
     console.error(err);
     showError('初始化失败：'+(err&&err.message?err.message:err));
