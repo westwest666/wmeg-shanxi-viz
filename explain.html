@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>从一个样本看懂 WMEG-Net：数据 · 公式 · 学习</title>
+<style>
+  :root{--bg:#050a12;--panel:#0b1624;--line:#1d3049;--txt:#e6eef8;--muted:#8ba2bd;--gold:#f4b942;--cyan:#38bdf8;--red:#ff6b6b}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:radial-gradient(1200px 700px at 50% -10%,#0b1b2e 0%,var(--bg) 60%);color:var(--txt);font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+  #app{max-width:1520px;margin:0 auto;padding:14px 18px 18px;min-height:100%}
+  .top{display:flex;justify-content:space-between;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:8px}
+  .top h1{font-size:19px;margin:0;letter-spacing:.4px}
+  .top .sub{color:var(--muted);font-size:12px}
+  .top a{color:var(--cyan);text-decoration:none;font-size:12.5px}
+  .layout{display:grid;grid-template-columns:200px minmax(0,1fr);gap:14px;align-items:start}
+  #chapters{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;position:sticky;top:10px}
+  #chapters .ch{padding:8px 10px;border-radius:8px;cursor:pointer;font-size:12.5px;color:var(--muted);line-height:1.4;margin-bottom:2px}
+  #chapters .ch b{display:block;color:var(--txt);font-weight:600;font-size:13px}
+  #chapters .ch.on{background:#14304a;color:#cfe3f7}
+  #chapters .ch.on b{color:#fff}
+  #chapters .ch span{font-size:10.5px;color:#64748b}
+  .stage{background:#050a12;border:1px solid var(--line);border-radius:14px;overflow:hidden;position:relative}
+  #cv{display:block;width:100%;height:auto;background:#050a12}
+  #caption{background:linear-gradient(180deg,#0b1624,#08111c);border-top:1px solid var(--line);padding:12px 18px 14px;min-height:96px}
+  #caption .ttl{font-size:13px;color:var(--gold);letter-spacing:.5px;margin-bottom:4px}
+  #caption .txt{font-size:14.5px;line-height:1.6}
+  #caption .fml{margin-top:6px;font-size:13.5px;color:#bfe3ff;font-family:"Cambria Math","Times New Roman",serif;letter-spacing:.3px}
+  .bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:9px 13px}
+  .bar button{background:#16304a;border:1px solid #2e4d70;color:var(--txt);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px}
+  .bar button:hover{background:#1d3f5f}
+  .bar button.primary{background:linear-gradient(135deg,#0ea5a5,#2563eb);border-color:transparent;font-weight:600}
+  .bar input[type=range]{flex:1;min-width:240px;accent-color:var(--gold)}
+  .bar .time{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12.5px;min-width:96px}
+  .bar select{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:5px 6px;font-family:inherit}
+  .hint{color:#64748b;font-size:11.5px;margin-top:8px;line-height:1.6}
+  @media (max-width:900px){.layout{grid-template-columns:1fr}#chapters{position:static;display:flex;gap:4px;overflow:auto;flex-wrap:nowrap}#chapters .ch{flex:0 0 auto}b{}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="top">
+    <div><h1>从一个样本看懂 WMEG-Net</h1><div class="sub">数据 → 7 日平滑 → 气象异常 → 滑动窗口/一个 batch → 因果卷积与城际图 → 时间投影 → 训练 → 预测与校准</div></div>
+    <a href="index.html">← 返回可视化主页</a>
+  </div>
+  <div class="layout">
+    <div id="chapters"></div>
+    <div>
+      <div class="stage"><canvas id="cv" width="1440" height="740"></canvas><div id="caption"><div class="ttl">—</div><div class="txt">正在载入数据…</div><div class="fml"></div></div></div>
+      <div class="bar">
+        <button id="play" class="primary">▶ 播放</button>
+        <button id="prev">◀ 上一章</button>
+        <button id="next">下一章 ▶</button>
+        <span class="time" id="time">0:00 / 5:00</span>
+        <input type="range" id="range" min="0" max="300" step="0.1" value="0"/>
+        <label style="font-size:12px;color:var(--muted)">速度
+          <select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select>
+        </label>
+        <button id="full">全屏</button>
+      </div>
+      <div class="hint">这是讲解动画，不是数据看板：每一章用真实数据与公式说明“数据被做了什么”。按空格播放/暂停，←/→ 跳 5 秒，点击左侧章节跳转。整段 5:00。</div>
+    </div>
+  </div>
+</div>
+<script src="assets/explain.js"></script>
+</body>
+</html>
