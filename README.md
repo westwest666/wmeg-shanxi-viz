@@ -16,7 +16,7 @@ v2 改版后首页是「故事 + 过程」而不是数据看板：结论条 → 
 
 ## VIBE 版（`vibe.html`）
 
-2:30、1920×1080、30fps；无旁白、双语短字幕、77 BPM 氛围 BGM，按「VIBE 知识大赏」风格重做：公式→一个数→矩阵→权重→GELU→编码器→学习前后→诚实结论→引用。视频：video/wmeg_vibe_2min30.mp4，字幕：video/wmeg_vibe_2min30.srt。
+2:30、1920×1080、30fps；无旁白、双语短字幕、77 BPM 氛围 BGM，按「VIBE 知识大赏」风格重做：公式→一个数→矩阵→权重→GELU→编码器→学习前后→诚实结论→引用。视频：video/wmeg_vibe_2min30_v2.mp4（We Never 风格原创变奏 BGM；公式 token 变形、矩阵行→向量→点积→GELU 连续 morph），字幕：video/wmeg_vibe_2min30_v2.srt。
 
 ## 数据与学习过程动画（`explain.html`）
 
