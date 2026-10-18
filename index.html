@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>WMEG-Net · 山西省流感样病例与气象可视化</title>
+<link rel="stylesheet" href="assets/style.css"/>
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">W</div>
+      <div>
+        <h1>山西省流感样病例 · 气象可视化</h1>
+        <p>WMEG-Net 结题项目 · 2015–2019 · 11 个地级市 · 建模输入窗口 20 天</p>
+      </div>
+    </div>
+    <div class="nav" id="nav"></div>
+  </header>
+  <section class="timebar" id="timebar"></section>
+  <main id="page"></main>
+  <footer class="foot">
+    数据：11 市逐日 ILI 计数（真实计数与 7 日平移平均）· 气象：ERA5-Land + 站点降水 · 城际边：行政区域接壤（19 对无向边）
+  </footer>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>
