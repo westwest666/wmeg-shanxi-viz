@@ -3,29 +3,37 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>从一个样本看懂 WMEG-Net：数据 · 公式 · 学习</title>
+<title>一个样本的旅程 · WMEG-Net 数据与学习过程</title>
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css"/>
 <style>
-  :root{--bg:#050a12;--panel:#0b1624;--line:#1d3049;--txt:#e6eef8;--muted:#8ba2bd;--gold:#f4b942;--cyan:#38bdf8;--red:#ff6b6b}
+  :root{--bg:#050a12;--panel:#0b1624;--line:#1d3049;--txt:#e8f0fa;--muted:#8ba2bd;--gold:#f4b942;--cyan:#38bdf8;--red:#ff6b6b}
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:radial-gradient(1200px 700px at 50% -10%,#0b1b2e 0%,var(--bg) 60%);color:var(--txt);font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif}
-  #app{max-width:1520px;margin:0 auto;padding:14px 18px 18px;min-height:100%}
+  #app{max-width:1560px;margin:0 auto;padding:14px 18px 18px;min-height:100%}
   .top{display:flex;justify-content:space-between;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:8px}
-  .top h1{font-size:19px;margin:0;letter-spacing:.4px}
+  .top h1{font-size:20px;margin:0;letter-spacing:.4px}
   .top .sub{color:var(--muted);font-size:12px}
   .top a{color:var(--cyan);text-decoration:none;font-size:12.5px}
-  .layout{display:grid;grid-template-columns:200px minmax(0,1fr);gap:14px;align-items:start}
+  .layout{display:grid;grid-template-columns:196px minmax(0,1fr);gap:14px;align-items:start}
   #chapters{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;position:sticky;top:10px}
-  #chapters .ch{padding:8px 10px;border-radius:8px;cursor:pointer;font-size:12.5px;color:var(--muted);line-height:1.4;margin-bottom:2px}
-  #chapters .ch b{display:block;color:var(--txt);font-weight:600;font-size:13px}
-  #chapters .ch.on{background:#14304a;color:#cfe3f7}
+  #chapters .ch{padding:8px 10px;border-radius:8px;cursor:pointer;font-size:12px;color:var(--muted);line-height:1.4;margin-bottom:2px}
+  #chapters .ch b{display:block;color:var(--txt);font-weight:600;font-size:12.5px}
+  #chapters .ch.on{background:#14304a}
   #chapters .ch.on b{color:#fff}
   #chapters .ch span{font-size:10.5px;color:#64748b}
   .stage{background:#050a12;border:1px solid var(--line);border-radius:14px;overflow:hidden;position:relative}
-  #cv{display:block;width:100%;height:auto;background:#050a12}
-  #caption{background:linear-gradient(180deg,#0b1624,#08111c);border-top:1px solid var(--line);padding:12px 18px 14px;min-height:96px}
+  #cv{display:block;width:100%;height:auto}
+  #mathLayer{position:absolute;inset:0;pointer-events:none}
+  .mcard{position:absolute;background:rgba(7,15,26,0.74);border:1px solid rgba(56,189,248,.22);border-radius:10px;padding:8px 12px;color:#eaf2fb;box-shadow:0 10px 26px rgba(0,0,0,.35);white-space:nowrap}
+  .mcard .katex{font-size:19px}
+  .mcard.lg .katex{font-size:24px}
+  .mcard.gold{border-color:rgba(244,185,66,.4)}
+  .mcard.red{border-color:rgba(255,107,107,.45)}
+  #caption{background:linear-gradient(180deg,#0b1624,#08111c);border-top:1px solid var(--line);padding:12px 18px 14px;min-height:104px}
   #caption .ttl{font-size:13px;color:var(--gold);letter-spacing:.5px;margin-bottom:4px}
-  #caption .txt{font-size:14.5px;line-height:1.6}
-  #caption .fml{margin-top:6px;font-size:13.5px;color:#bfe3ff;font-family:"Cambria Math","Times New Roman",serif;letter-spacing:.3px}
+  #caption .txt{font-size:14.5px;line-height:1.6;max-width:1250px}
+  #caption .fml{margin-top:7px;color:#cfe6ff;overflow-x:auto}
+  #caption .fml .katex{font-size:16px}
   .bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:9px 13px}
   .bar button{background:#16304a;border:1px solid #2e4d70;color:var(--txt);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px}
   .bar button:hover{background:#1d3f5f}
@@ -34,19 +42,33 @@
   .bar .time{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12.5px;min-width:96px}
   .bar select{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:5px 6px;font-family:inherit}
   .hint{color:#64748b;font-size:11.5px;margin-top:8px;line-height:1.6}
-  @media (max-width:900px){.layout{grid-template-columns:1fr}#chapters{position:static;display:flex;gap:4px;overflow:auto;flex-wrap:nowrap}#chapters .ch{flex:0 0 auto}b{}}
+  .videoline{margin-top:10px;font-size:12.5px;color:var(--muted)}
+  .videoline a{color:var(--gold);text-decoration:none}
+  body.record{overflow:hidden;background:#050a12}
+  body.record .top, body.record #chapters, body.record .bar, body.record .hint, body.record .videoline{display:none !important}
+  body.record #app{max-width:none;padding:0}
+  body.record .layout{grid-template-columns:1fr;gap:0}
+  body.record .stage{border:none;border-radius:0}
+  body.record #caption{padding:14px 26px 16px;min-height:96px}
+  body.record #caption .txt{font-size:17px}
+  body.record #caption .fml .katex{font-size:17px}
+  @media (max-width:900px){.layout{grid-template-columns:1fr}#chapters{position:static;display:flex;gap:4px;overflow:auto;flex-wrap:nowrap}#chapters .ch{flex:0 0 auto}}
 </style>
 </head>
 <body>
 <div id="app">
   <div class="top">
-    <div><h1>从一个样本看懂 WMEG-Net</h1><div class="sub">数据 → 7 日平滑 → 气象异常 → 滑动窗口/一个 batch → 因果卷积与城际图 → 时间投影 → 训练 → 预测与校准</div></div>
+    <div><h1>一个样本的旅程</h1><div class="sub">一个 batch、一条 7 日平滑公式、一张输入矩阵，如何进入 WMEG-Net 并变成 12 步预测</div></div>
     <a href="index.html">← 返回可视化主页</a>
   </div>
   <div class="layout">
     <div id="chapters"></div>
     <div>
-      <div class="stage"><canvas id="cv" width="1440" height="740"></canvas><div id="caption"><div class="ttl">—</div><div class="txt">正在载入数据…</div><div class="fml"></div></div></div>
+      <div class="stage">
+        <canvas id="cv" width="1440" height="740"></canvas>
+        <div id="mathLayer"></div>
+        <div id="caption"><div class="ttl">—</div><div class="txt">正在载入数据…</div><div class="fml"></div></div>
+      </div>
       <div class="bar">
         <button id="play" class="primary">▶ 播放</button>
         <button id="prev">◀ 上一章</button>
@@ -58,10 +80,12 @@
         </label>
         <button id="full">全屏</button>
       </div>
-      <div class="hint">这是讲解动画，不是数据看板：每一章用真实数据与公式说明“数据被做了什么”。按空格播放/暂停，←/→ 跳 5 秒，点击左侧章节跳转。整段 5:00。</div>
+      <div class="hint">真实数据 · 一个样本（太原，2019-11-27 ~ 12-16）——从原始计数、平滑、气象标准化，到 16×20 输入矩阵、编码器、训练与 12 步预测。空格播放/暂停，←/→ 跳 5 秒。</div>
+      <div class="videoline">视频版：<a href="video/wmeg_explainer_5min.mp4" download>MP4 · 5:00 · 内嵌字幕</a>　｜　<a href="video/wmeg_explainer_5min.srt" download>下载 SRT 字幕</a></div>
     </div>
   </div>
 </div>
+<script src="assets/vendor/katex/katex.min.js"></script>
 <script src="assets/explain.js"></script>
 </body>
 </html>
