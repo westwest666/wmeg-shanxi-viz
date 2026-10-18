@@ -108,9 +108,9 @@
         layer.appendChild(d); FX.el=d;
       }
     }
-    var a=clamp((T-FX.change)/0.6,0,1);
-    if(FX.el)FX.el.style.opacity=a;
-    if(FX.prev){FX.prev.style.opacity=1-a; if(a>=1){FX.prev.remove();FX.prev=null;}}
+    // 直接可读：不做 0 透明度淡入，避免逐帧 seek 时公式不可见
+    if(FX.el)FX.el.style.opacity=1;
+    if(FX.prev){FX.prev.remove();FX.prev=null;}
   }
 
   /* ---------- HOOK ---------- */
