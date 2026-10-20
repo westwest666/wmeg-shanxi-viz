@@ -68,6 +68,11 @@ function buildMap(){
   grad.appendChild(svgEl('stop',{offset:'0%','stop-color':'#0a3f5b','stop-opacity':'.38'}));
   grad.appendChild(svgEl('stop',{offset:'100%','stop-color':'#03101d','stop-opacity':'0'}));
   defs.appendChild(grad);
+  var disc=svgEl('radialGradient',{id:'discGrad',cx:'50%',cy:'50%',r:'50%'});
+  disc.appendChild(svgEl('stop',{offset:'0%','stop-color':'#0b354e','stop-opacity':'.38'}));
+  disc.appendChild(svgEl('stop',{offset:'68%','stop-color':'#082539','stop-opacity':'.24'}));
+  disc.appendChild(svgEl('stop',{offset:'100%','stop-color':'#03101d','stop-opacity':'0'}));
+  defs.appendChild(disc);
   var glow=svgEl('filter',{id:'nodeGlow',x:'-80%',y:'-80%',width:'260%',height:'260%'});
   var blur=svgEl('feGaussianBlur',{stdDeviation:'3',result:'b'});
   var merge=svgEl('feMerge');merge.appendChild(svgEl('feMergeNode',{in:'b'}));merge.appendChild(svgEl('feMergeNode',{in:'SourceGraphic'}));
@@ -76,6 +81,8 @@ function buildMap(){
   svg.appendChild(svgEl('rect',{x:0,y:0,width:900,height:760,fill:'url(#mapBg)'}));
   // circular HUD: rings, ticks, rotating sweep, cardinal annotations
   var gHud=svgEl('g',{class:'hud-rings'});
+  gHud.appendChild(svgEl('circle',{cx:450,cy:380,r:370,fill:'url(#discGrad)'}));
+  gHud.appendChild(svgEl('circle',{cx:450,cy:380,r:370,fill:'none',stroke:'rgba(66,215,255,.30)','stroke-width':'1.1','stroke-dasharray':'1 9'}));
   [110,205,292,350].forEach(function(r,idx){gHud.appendChild(svgEl('circle',{cx:450,cy:380,r:r,class:'map-ring',opacity:idx===3?'.95':'.55',stroke:idx===3?'rgba(66,215,255,.40)':'rgba(66,215,255,.075)','stroke-width':idx===3?'1.2':'0.8','stroke-dasharray':idx===3?'3 7':'none'}))});
   var spokes=svgEl('g',{stroke:'rgba(66,215,255,.09)','stroke-width':'.7'});
   for(var si=0;si<12;si++){var sa=si/12*Math.PI*2;var sr1=115,sr2=350;spokes.appendChild(svgEl('line',{x1:(450+Math.cos(sa)*sr1).toFixed(1),y1:(380+Math.sin(sa)*sr1).toFixed(1),x2:(450+Math.cos(sa)*sr2).toFixed(1),y2:(380+Math.sin(sa)*sr2).toFixed(1)}))}
