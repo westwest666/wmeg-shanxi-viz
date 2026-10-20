@@ -3,29 +3,137 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>WMEG-Net · 山西省流感样病例与气象可视化</title>
-<link rel="stylesheet" href="assets/style.css"/>
+<title>山西省流感样病例 · WMEG-Net 预测大屏</title>
+<link rel="stylesheet" href="assets/screen.css"/>
 </head>
 <body>
-<div id="app">
-  <header class="topbar">
-    <div class="brand">
-      <div class="logo">W</div>
-      <div>
-        <h1>山西省流感样病例 · 气象可视化</h1>
-        <p>WMEG-Net 结题项目 · 2015–2019 · 11 个地级市 · 建模输入窗口 20 天</p>
-      </div>
+<div id="screen">
+  <div class="screen-bg"></div>
+  <header class="screen-head">
+    <div class="head-left">
+      <div class="sys-tag"><i></i> WMEG-Net / 时空预测系统</div>
+      <div class="sys-sub">山西省 · 11 个地级市 · 2015—2019</div>
     </div>
-    <div class="nav" id="nav"><a class="btn" href="vibe.html" style="border-color:#f4b942;color:#f4b942">VIBE 版 · 2:30 →</a><a class="btn" href="explain.html">详细动画 →</a></div>
+    <div class="head-title">
+      <div class="title-kicker">SPATIOTEMPORAL INFLUENZA FORECASTING</div>
+      <h1>山西省流感样病例监测与预测大屏</h1>
+      <div class="title-line"><span></span><b></b><span></span></div>
+    </div>
+    <div class="head-right">
+      <nav class="head-nav">
+        <a class="on" href="index.html">总览大屏</a>
+        <a href="explore.html">详细探查</a>
+        <a href="explain.html">机理动画</a>
+        <a href="vibe.html">VIBE</a>
+      </nav>
+      <div class="clock"><b id="clock">--:--:--</b><span id="date">----</span></div>
+    </div>
   </header>
-  <section class="timebar" id="timebar"></section>
-  <main id="page"></main>
-  <footer class="foot">
-    数据：11 市逐日 ILI 计数（真实计数与 7 日平移平均）· 气象：ERA5-Land + 站点降水 · 城际边：行政区域接壤（19 对无向边）
+
+  <main class="screen-grid">
+    <aside class="col col-left">
+      <section class="panel p-overview">
+        <div class="panel-h"><span class="ph-ico"></span><h2>实时概况</h2><em>OVERVIEW</em></div>
+        <div class="metric-grid">
+          <div class="metric"><span>当前全省病例</span><b id="m-total">—</b><small>7 日平滑合计 / 例</small></div>
+          <div class="metric"><span>峰值城市</span><b id="m-topcity">—</b><small id="m-topval">—</small></div>
+          <div class="metric"><span>7 日变化</span><b id="m-delta">—</b><small>较 7 日前 / 例</small></div>
+          <div class="metric"><span>校准后 RMSE</span><b id="m-rmse">2.0125</b><small>持续性基线 2.1225</small></div>
+        </div>
+      </section>
+
+      <section class="panel p-rank">
+        <div class="panel-h"><span class="ph-ico"></span><h2>11 城病例排行</h2><em>CITY RANKING</em></div>
+        <div class="rank-head"><span>城市</span><span>7 日平滑病例</span></div>
+        <div id="rank" class="rank-list"></div>
+      </section>
+
+      <section class="panel p-weather">
+        <div class="panel-h"><span class="ph-ico"></span><h2>气象背景</h2><em>METEOROLOGY</em></div>
+        <div class="weather-row">
+          <div class="weather-k"><span>全省日均温</span><b id="w-tavg">—</b></div>
+          <div class="weather-k"><span>最大降水</span><b id="w-precip">—</b></div>
+          <div class="weather-k"><span>平均湿度</span><b id="w-rh">—</b></div>
+        </div>
+        <div id="weather-spark" class="spark"></div>
+        <p class="panel-note" id="weather-note">气象只使用与病例同期的历史观测；预测期不使用未来气象。</p>
+      </section>
+    </aside>
+
+    <section class="col col-center">
+      <div class="map-panel">
+        <div class="map-head">
+          <div class="map-title"><span>山西省 · 流感样病例时空态势</span><b id="map-date">2019-12-28</b></div>
+          <div class="map-tabs" id="map-tabs">
+            <button data-mode="cases" class="on">病例</button>
+            <button data-mode="precip">降水</button>
+            <button data-mode="tavg">气温</button>
+          </div>
+        </div>
+        <div class="map-stage">
+          <svg id="map" viewBox="0 0 780 610" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="map-corner tl"></div><div class="map-corner tr"></div>
+          <div class="map-corner bl"></div><div class="map-corner br"></div>
+          <div class="map-legend" id="map-legend"></div>
+          <div class="map-status">
+            <i></i> 城际传播图 · 19 对无向边
+            <span>节点大小 = 当前指标</span>
+          </div>
+          <div class="map-tip" id="map-tip"></div>
+        </div>
+        <div class="timeline">
+          <div class="tl-left">
+            <button id="play" class="play">▶</button>
+            <div class="tl-time"><b id="tl-date">2019-12-28</b><span id="tl-week">周六</span></div>
+            <select id="speed" aria-label="播放速度">
+              <option value="10">10 天/秒</option>
+              <option value="5">5 天/秒</option>
+              <option value="2">2 天/秒</option>
+            </select>
+          </div>
+          <input id="slider" type="range" min="0" max="1825" value="0"/>
+          <div class="tl-right"><span>2015-01</span><span>2019-12</span></div>
+          <div id="province-spark" class="province-spark"></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="col col-right">
+      <section class="panel p-forecast">
+        <div class="panel-h"><span class="ph-ico"></span><h2>模型预测</h2><em>FORECAST · TEST</em></div>
+        <div class="chart-legend"><span class="lg true">真实</span><span class="lg pred">集成预测</span></div>
+        <div id="forecast-chart" class="forecast-chart"></div>
+        <div class="forecast-metrics">
+          <div><span>原始 RMSE</span><b>2.1611</b></div>
+          <div><span>校准后</span><b class="cy">2.0125</b></div>
+          <div><span>PCC</span><b>0.8143</b></div>
+          <div><span>参数量</span><b>15,385</b></div>
+        </div>
+      </section>
+
+      <section class="panel p-error">
+        <div class="panel-h"><span class="ph-ico"></span><h2>逐城误差</h2><em>RMSE BY CITY</em></div>
+        <div id="error-chart" class="error-chart"></div>
+      </section>
+
+      <section class="panel p-brief">
+        <div class="panel-h"><span class="ph-ico"></span><h2>态势研判</h2><em>BRIEFING</em></div>
+        <div class="brief-mark">!</div>
+        <div class="brief-body">
+          <b id="brief-title">冬季高峰 · 太原/临汾/运城偏高</b>
+          <p id="brief-text">2019-12-28 全省 7 日平滑病例达到阶段性高位；模型对第 1 步较稳定，长步长误差随预测步长增长。</p>
+        </div>
+        <div class="brief-foot"><span>模型：WMEG-Net</span><span>输入 W=20 / 输出 H=12</span></div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="screen-foot">
+    <span>数据：11 市逐日 ILI 监测计数 · ERA5-Land 气象 · 地面降水 · 行政接壤图</span>
+    <span>口径：7 日平滑序列；RMSE 为 132 个“城市 × 步长”单元等权平均</span>
+    <span>WMEG-Net · 15,385 参数 · 15 种子集成</span>
   </footer>
 </div>
-<script src="assets/app.js"></script>
-<script src="assets/three-d.js"></script>
-<script src="assets/v2.js"></script>
+<script src="assets/screen.js"></script>
 </body>
 </html>
