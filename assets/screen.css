@@ -100,7 +100,8 @@ body{display:block;position:relative}
 .map-panel:before,.map-panel:after{content:"";position:absolute;width:22px;height:22px;z-index:2;pointer-events:none}
 .map-panel:before{left:-1px;top:-1px;border-left:2px solid var(--cyan);border-top:2px solid var(--cyan)}
 .map-panel:after{right:-1px;bottom:-1px;border-right:2px solid var(--cyan);border-bottom:2px solid var(--cyan)}
-.map-head{height:var(--map-head-h);display:flex;align-items:center;padding:0 18px;border-bottom:1px solid rgba(66,215,255,.12)}
+.map-head{position:absolute;left:0;right:0;top:0;height:var(--map-head-h);display:flex;align-items:center;padding:0 18px;border-bottom:1px solid rgba(66,215,255,.10);z-index:6;pointer-events:none;background:linear-gradient(180deg,rgba(3,13,24,.92),rgba(3,13,24,.58) 68%,transparent)}
+.map-head .map-tabs{pointer-events:auto}
 .map-title span{display:block;font-size:17px;letter-spacing:.1em;color:#dff8ff}
 .map-title b{display:block;margin-top:3px;font-size:11px;letter-spacing:.12em;color:#4f8fab;font-weight:400}
 .map-tabs{margin-left:auto;display:flex;gap:6px}

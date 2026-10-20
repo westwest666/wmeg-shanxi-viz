@@ -46,8 +46,8 @@ function projectSetup(){
   });
   var minx=Infinity,maxx=-Infinity,miny=Infinity,maxy=-Infinity;
   coords.forEach(function(c){minx=Math.min(minx,c[0]);maxx=Math.max(maxx,c[0]);miny=Math.min(miny,c[1]);maxy=Math.max(maxy,c[1])});
-  var pad=32,W=900,H=760;
-  var sc=Math.min((W-pad*2)/(maxx-minx),(H-pad*2)/(maxy-miny));
+  var padX=8,padY=6,W=900,H=760;
+  var sc=Math.min((W-padX*2)/(maxx-minx),(H-padY*2)/(maxy-miny));
   var ox=(W-(maxx-minx)*sc)/2,oy=(H-(maxy-miny)*sc)/2;
   MAP={W:W,H:H,project:function(lon,lat){return [ox+(lon-minx)*sc,oy+(maxy-lat)*sc]},bounds:{minx:minx,maxx:maxx,miny:miny,maxy:maxy}};
 }
