@@ -95,7 +95,7 @@ function buildMap(){
   sweep.appendChild(wedge);
   var anim=svgEl('animateTransform',{attributeName:'transform',type:'rotate',from:'0 450 380',to:'360 450 380',dur:'26s',repeatCount:'indefinite'});
   sweep.appendChild(anim);gHud.appendChild(sweep);
-  function hudText(x,y,t,anchor,size){var tx=svgEl('text',{x:x,y:y,'text-anchor':anchor||'start',fill:'rgba(125,191,214,.55)','font-size':size||'9','letter-spacing':'1.4'});tx.textContent=t;gHud.appendChild(tx)}
+  function hudText(x,y,t,anchor,size){var tx=svgEl('text',{x:x,y:y,'text-anchor':anchor||'start',fill:'rgba(125,191,214,.62)','font-size':size||'10','letter-spacing':'1.3'});tx.textContent=t;gHud.appendChild(tx)}
   hudText(80,350,'11 CITIES');hudText(80,366,'11 地级市');hudText(820,350,'19 EDGES','end');hudText(820,366,'19 对无向边','end');
   hudText(80,414,'W = 20');hudText(80,430,'输入窗口');hudText(820,414,'H = 12','end');hudText(820,430,'预测步长','end');
   hudText(450,46,'SHANXI · 山西','middle','10');hudText(450,726,'WMEG-Net / SPATIOTEMPORAL FORECAST','middle','8');
@@ -151,11 +151,12 @@ function buildMap(){
   updateMap();
 }
 function showTip(ev,name){
-  var tip=$('#map-tip');var r=$('#screen').getBoundingClientRect();var scale=r.width/1920;
+  var tip=$('#map-tip');var stage=$('.map-stage').getBoundingClientRect();var screenR=$('#screen').getBoundingClientRect();var scale=screenR.width/1920;
   var i=state.idx;
   tip.innerHTML='<b>'+name+'</b><br>'+modeName()+'：'+cityValueText(name,i)+'<br>日期：'+DATA.meta.dates[i];
   tip.style.display='block';
-  var x=(ev.clientX-r.left)/scale+14,y=(ev.clientY-r.top)/scale+14;
+  var x=(ev.clientX-stage.left)/scale+14,y=(ev.clientY-stage.top)/scale+14;
+  x=Math.max(8,Math.min(x,stage.width/scale-160));y=Math.max(8,Math.min(y,stage.height/scale-62));
   tip.style.left=x+'px';tip.style.top=y+'px';
 }
 function hideTip(){$('#map-tip').style.display='none'}
