@@ -376,3 +376,10 @@ body{display:block;position:relative}
 .map-title b{font-size:clamp(10px,.58vw,11px)}
 .tl-right{font-size:clamp(9px,.48vw,9.5px)}
 .chart-legend{font-size:clamp(10px,.52vw,10px)}
+@media (max-height:960px){
+  .col-right{grid-template-rows:minmax(0,1fr) 184px 190px}
+  .error-chart{height:142px}
+  .brief-body p{line-height:1.45}
+}
+.alert-chip{cursor:pointer}
+.alert-chip:hover{border-color:rgba(255,209,102,.65)}

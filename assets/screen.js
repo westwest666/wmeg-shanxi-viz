@@ -490,6 +490,7 @@ function boot(){
   $('#toggle-labels').addEventListener('click',function(){state.labels=!state.labels;this.classList.toggle('on',state.labels);$('#map').classList.toggle('hide-values',!state.labels)});
   $('#horizon-select').addEventListener('click',function(ev){var b=ev.target.closest('button');if(!b)return;state.horizon=+b.getAttribute('data-h');drawHorizon();updateURL();if($('#city-drawer').classList.contains('open'))drawDrawer()});
   $('#btn-help').addEventListener('click',openHelp);$('#help-close').addEventListener('click',closeHelp);$('#help-mask').addEventListener('click',closeHelp);
+  $('#alert-chip').addEventListener('click',function(){if(state.city)openDrawer(state.city)});
   $('#btn-full').addEventListener('click',toggleFull);
   $('#drawer-close').addEventListener('click',closeDrawer);$('#drawer-mask').addEventListener('click',closeDrawer);$('#drawer-csv').addEventListener('click',downloadCSV);
   document.addEventListener('keydown',function(ev){
