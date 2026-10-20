@@ -27,6 +27,10 @@
         <a href="vibe.html">VIBE</a>
       </nav>
       <div class="clock"><b id="clock">--:--:--</b><span id="date">----</span></div>
+      <div class="head-actions">
+        <button id="btn-help" class="icon-btn" title="数据与指标说明" aria-label="数据与指标说明">?</button>
+        <button id="btn-full" class="icon-btn" title="全屏" aria-label="全屏">⛶</button>
+      </div>
     </div>
   </header>
 
@@ -70,6 +74,10 @@
             <button data-mode="precip">降水</button>
             <button data-mode="tavg">气温</button>
           </div>
+          <div class="map-tools">
+            <button id="toggle-edges" class="tool-btn on" title="显示/隐藏城际边">边</button>
+            <button id="toggle-labels" class="tool-btn on" title="显示/隐藏城市数值">值</button>
+          </div>
         </div>
         <div class="map-stage">
           <svg id="map" viewBox="0 0 900 760" preserveAspectRatio="xMidYMid meet"></svg>
@@ -85,7 +93,10 @@
         <div class="timeline">
           <div class="tl-left">
             <button id="play" class="play">▶</button>
+            <button id="prev" class="step-btn" aria-label="前一天">‹</button>
+            <button id="next" class="step-btn" aria-label="后一天">›</button>
             <div class="tl-time"><b id="tl-date">2019-12-28</b><span id="tl-week">周六</span></div>
+            <input id="date-pick" type="date" min="2015-01-01" max="2019-12-31" value="2019-12-28" aria-label="选择日期"/>
             <select id="speed" aria-label="播放速度">
               <option value="10">10 天/秒</option>
               <option value="5">5 天/秒</option>
@@ -110,7 +121,7 @@
           <div><span>PCC</span><b>0.8143</b></div>
           <div><span>参数量</span><b>15,385</b></div>
         </div>
-        <div class="horizon-wrap"><span>逐步长 RMSE</span><div id="horizon-chart" class="horizon-chart"></div></div>
+        <div class="horizon-wrap"><span>逐步长 RMSE</span><div id="horizon-chart" class="horizon-chart"></div><div id="horizon-select" class="horizon-select"><button data-h="1" class="on">1 步</button><button data-h="6">6 步</button><button data-h="12">12 步</button><em id="horizon-stat">RMSE 0.56 · MAE 0.40 · PCC 0.99</em></div></div>
       </section>
 
       <section class="panel p-error">
@@ -136,6 +147,39 @@
     <span>WMEG-Net · 15,385 参数 · 15 种子集成</span>
   </footer>
 </div>
+
+<div id="drawer-mask" class="drawer-mask"></div>
+<aside id="city-drawer" class="city-drawer" aria-hidden="true" role="dialog" aria-label="城市详情">
+  <div class="drawer-head">
+    <div><span class="drawer-kicker">CITY PROFILE · 城市画像</span><h2 id="drawer-city">临汾市</h2><p id="drawer-sub">—</p></div>
+    <button id="drawer-close" class="drawer-close" aria-label="关闭城市详情">×</button>
+  </div>
+  <div class="drawer-stats" id="drawer-stats"></div>
+  <div class="drawer-section"><div class="drawer-sec-h"><h3>近 60 天病例</h3><span>原始 / 7 日平滑</span></div><div id="drawer-trend" class="drawer-chart"></div></div>
+  <div class="drawer-section"><div class="drawer-sec-h"><h3>同期气象</h3><span>气温 / 降水</span></div><div id="drawer-weather-chart" class="drawer-chart"></div></div>
+  <div class="drawer-metrics" id="drawer-metrics"></div>
+  <div class="drawer-section drawer-neighbors"><div class="drawer-sec-h"><h3>接壤城市</h3><span>19 条无向边</span></div><div id="drawer-neighbors" class="neighbor-list"></div></div>
+  <div class="drawer-actions">
+    <a id="drawer-explore" class="drawer-link" href="explore.html">在详细探查页打开 →</a>
+    <button id="drawer-csv" class="drawer-btn">导出 CSV</button>
+  </div>
+</aside>
+
+<div id="help-mask" class="modal-mask"></div>
+<div id="help-modal" class="help-modal" role="dialog" aria-hidden="true" aria-label="数据与指标说明">
+  <div class="drawer-head"><div><span class="drawer-kicker">ABOUT THIS DASHBOARD</span><h2>数据与指标说明</h2></div><button id="help-close" class="drawer-close" aria-label="关闭说明">×</button></div>
+  <div class="help-body">
+    <p><b>时间范围</b>2015-01-01 至 2019-12-31，11 个地级市逐日数据；默认打开 2019-12-28（2019 年峰值日）。</p>
+    <p><b>病例口径</b>页面显示 7 日平滑病例数，不是原始监测计数；地图与排行使用同一口径。</p>
+    <p><b>模型口径</b>WMEG-Net，15,385 个可学习参数，输入窗口 W=20 天，输出 H=12 步；测试集为 2018-12-03 至 2019-12-31。</p>
+    <p><b>误差口径</b>原始 RMSE 2.1611，持续性基线 2.1225；校准后 RMSE 2.0125。总体 RMSE 为 132 个“城市 × 步长”单元等权平均。</p>
+    <p><b>气象</b>ERA5-Land 日均气温、相对湿度、绝对湿度与地面降水；预测期不使用未来气象。</p>
+    <p><b>快捷键</b><kbd>Space</kbd> 播放/暂停 · <kbd>←</kbd><kbd>→</kbd> 前后一天 · <kbd>Esc</kbd> 关闭弹层。</p>
+    <p><b>更多</b>右上角「详细探查」可查看每城输入窗口、拟合曲线与机理；「机理动画」「VIBE」为讲解页。</p>
+  </div>
+</div>
+
+<div id="loading" class="loading"><div class="loader"></div><span>正在加载 11 城 · 1,826 天数据…</span></div>
 <script src="assets/screen.js"></script>
 </body>
 </html>

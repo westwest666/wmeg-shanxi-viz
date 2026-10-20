@@ -2,7 +2,7 @@
 /* CENI-style big screen · data-driven */
 var DATA=null, GEO=null, FIT=null;
 var CITY={}, SERIES={}, PROV={};
-var state={idx:0,mode:'cases',city:null,playing:false,speed:10,timer:null};
+var state={idx:0,mode:'cases',city:null,playing:false,speed:10,timer:null,horizon:1,edges:true,labels:true};
 var MAP=null;
 var NS='http://www.w3.org/2000/svg';
 
@@ -125,7 +125,7 @@ function buildMap(){
     var p=svgEl('path',{d:d,class:'city-zone','data-name':name,fill:'#0b415a',stroke:'rgba(94,232,255,.72)','stroke-width':'1.25','fill-rule':'evenodd'});
     p.addEventListener('mousemove',function(ev){showTip(ev,name)});
     p.addEventListener('mouseleave',hideTip);
-    p.addEventListener('click',function(){selectCity(name)});
+    p.addEventListener('click',function(){selectCity(name,true)});
     gZones.appendChild(p);
   });
   svg.appendChild(gZones);
@@ -144,29 +144,28 @@ function buildMap(){
     g.appendChild(pulse);g.appendChild(ring);g.appendChild(core);g.appendChild(label);g.appendChild(val);
     g.addEventListener('mousemove',function(ev){showTip(ev,c.name)});
     g.addEventListener('mouseleave',hideTip);
-    g.addEventListener('click',function(){selectCity(c.name)});
+    g.addEventListener('click',function(){selectCity(c.name,true)});
     gNodes.appendChild(g);
   });
   svg.appendChild(gNodes);
   updateMap();
 }
 function showTip(ev,name){
-  var tip=$('#map-tip');var stage=$('.map-stage').getBoundingClientRect();var screenR=$('#screen').getBoundingClientRect();var scale=screenR.width/1920;
+  var tip=$('#map-tip');var stage=$('.map-stage').getBoundingClientRect();
   var i=state.idx;
   tip.innerHTML='<b>'+name+'</b><br>'+modeName()+'：'+cityValueText(name,i)+'<br>日期：'+DATA.meta.dates[i];
   tip.style.display='block';
-  var x=(ev.clientX-stage.left)/scale+14,y=(ev.clientY-stage.top)/scale+14;
-  x=Math.max(8,Math.min(x,stage.width/scale-160));y=Math.max(8,Math.min(y,stage.height/scale-62));
+  var x=(ev.clientX-stage.left)+14,y=(ev.clientY-stage.top)+14;
+  x=Math.max(8,Math.min(x,stage.width-160));y=Math.max(8,Math.min(y,stage.height-62));
   tip.style.left=x+'px';tip.style.top=y+'px';
 }
 function hideTip(){$('#map-tip').style.display='none'}
-function selectCity(name){
+function selectCity(name,open){
   state.city=name;
-  updateMap();
-  drawForecast();
-  drawHorizon();
-  drawRanking();
+  updateMap();drawForecast();drawHorizon();drawRanking();updateHorizonStat();
   var h=$('.p-forecast .panel-h h2'); if(h)h.textContent='模型预测 · '+CITY[name].short;
+  if(open)openDrawer(name); else if($('#city-drawer').classList.contains('open'))drawDrawer();
+  updateURL();
 }
 function updateMap(){
   var i=state.idx;
@@ -204,7 +203,7 @@ function drawRanking(){
       '<span class="rk">'+String(idx+1).padStart(2,'0')+'</span><span class="nm">'+d.short+'</span>'+
       '<span class="bar"><i style="width:'+w+'%"></i></span><span class="vl">'+fmt(d.v,1)+'</span></div>';
   }).join('');
-  $$('#rank .rank-row').forEach(function(r){r.addEventListener('click',function(){selectCity(r.getAttribute('data-name'))})});
+  $$('#rank .rank-row').forEach(function(r){r.addEventListener('click',function(){selectCity(r.getAttribute('data-name'),true)})});
   var total=arr.reduce(function(s,d){return s+d.v},0)||1;
   var top3=arr.slice(0,3).reduce(function(s,d){return s+d.v},0);
   var pct=Math.round(top3/total*100);
@@ -226,6 +225,8 @@ function updateMetrics(){
   $('#tl-date').textContent=DATA.meta.dates[i];
   $('#tl-week').textContent=weekday(DATA.meta.dates[i]);
   $('#date').textContent=DATA.meta.dates[i];
+  $('#slider').value=state.idx;
+  $('#date-pick').value=DATA.meta.dates[i];
   // weather
   var ta=0,rh=0,pmax=0,n=0;
   DATA.meta.cities.forEach(function(c){var s=SERIES[c.name];ta+=s.tavg[i]||0;rh+=s.rh[i]||0;pmax=Math.max(pmax,s.precip[i]||0);n++});
@@ -298,23 +299,45 @@ function drawError(){
   });
   $('#error-chart').innerHTML='<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'+bars+'</svg>';
 }
+function updateHorizonStat(){
+  var name=state.city||'临汾市';
+  var m=FIT.metrics.cities[name]||FIT.metrics.cities['临汾市'];
+  if(!m){return}
+  var h=clamp(state.horizon,1,12),k=h-1;
+  var stat=$('#horizon-stat');
+  if(stat)stat.textContent='第 '+h+' 步 · RMSE '+fmt(m.rmseH[k],2)+' · MAE '+fmt(m.maeH[k],2)+' · PCC '+fmt(m.pccH[k],2);
+  $$('#horizon-select button').forEach(function(b){b.classList.toggle('on',+b.getAttribute('data-h')===h)});
+  $$('#horizon-chart .hz-bar').forEach(function(r){r.setAttribute('opacity',+r.getAttribute('data-h')===h?'1':'.42')});
+}
 function drawHorizon(){
   var name=state.city||'临汾市';
   var m=FIT.metrics.cities[name]||FIT.metrics.cities['临汾市'];
   if(!m||!m.rmseH){$('#horizon-chart').innerHTML='';return}
-  var vals=m.rmseH,w=370,h=58,left=0,bottom=14,top=6,bw=(w-4)/vals.length-2;
+  var vals=m.rmseH,w=370,h=58,bottom=14,top=6,bw=(w-4)/vals.length-2;
   var max=Math.max.apply(null,vals);
   var bars='';
   vals.forEach(function(v,i){
     var bh=(v/max)*(h-top-bottom);var x=2+i*((w-4)/vals.length);var y=h-bottom-bh;
-    var col=i<2?'#35e0c8':(i<6?'#28bdda':'#2d8fb0');
-    bars+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(1,bh).toFixed(1)+'" fill="'+col+'" opacity=".9"/>';
-    if(i===0||i===5||i===11)bars+='<text x="'+(x+bw/2).toFixed(1)+'" y="'+(h-3)+'" fill="#527f99" font-size="8" text-anchor="middle">'+(i+1)+'</text>';
+    var col=state.horizon===i+1?'#7ff2dd':(i<2?'#35e0c8':(i<6?'#28bdda':'#2d8fb0'));
+    bars+='<rect class="hz-bar" data-h="'+(i+1)+'" x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(1,bh).toFixed(1)+'" fill="'+col+'" opacity="'+(state.horizon===i+1?'1':'.42')+'"/>';
+    if(i===0||i===5||i===11)bars+='<text x="'+(x+bw/2).toFixed(1)+'" y="'+(h-3)+'" fill="#5c8ea8" font-size="8" text-anchor="middle">'+(i+1)+'</text>';
   });
   $('#horizon-chart').innerHTML='<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'+bars+'</svg>';
+  $$('#horizon-chart .hz-bar').forEach(function(r){r.style.cursor='pointer';r.addEventListener('click',function(){state.horizon=+r.getAttribute('data-h');drawHorizon();updateURL();if($('#city-drawer').classList.contains('open'))drawDrawer()})});
+  updateHorizonStat();
+}
+function updateURL(){
+  if(!DATA)return;
+  var p=new URLSearchParams();
+  p.set('date',DATA.meta.dates[state.idx]);p.set('mode',state.mode);
+  if(state.city)p.set('city',state.city);
+  p.set('horizon',state.horizon);
+  history.replaceState(null,'',location.pathname+'?'+p.toString());
 }
 function updateAll(){
   updateMap();drawRanking();updateMetrics();drawWeatherSpark();drawForecast();drawError();drawHorizon();
+  if($('#city-drawer').classList.contains('open'))drawDrawer();
+  updateURL();
 }
 function step(dir){
   state.idx=(state.idx+dir+1826)%1826;
@@ -327,6 +350,83 @@ function playToggle(){
   if(state.timer)clearInterval(state.timer);
   if(state.playing){state.timer=setInterval(function(){step(1)},1000/state.speed)}
 }
+function setMode(mode){
+  if(['cases','precip','tavg'].indexOf(mode)<0)return;
+  state.mode=mode;
+  $$('#map-tabs button').forEach(function(x){x.classList.toggle('on',x.getAttribute('data-mode')===mode)});
+  updateAll();
+}
+/* ---------- city drawer ---------- */
+function drawerStat(label,value,cls){
+  return '<div class="drawer-stat"><span>'+label+'</span><b class="'+(cls||'')+'">'+value+'</b></div>';
+}
+function drawerChart(values,color,fill,secondary){
+  var w=410,h=74,pad=2,n=values.length;var min=Math.min.apply(null,values),max=Math.max.apply(null,values);
+  var pts=values.map(function(v,i){return [pad+i/(n-1)*(w-pad*2),h-pad-(v-min)/(max-min||1)*(h-pad*2)]});
+  var d=pts.map(function(p,i){return (i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)}).join('');
+  var area=d+'L'+(w-pad)+' '+(h-pad)+'L'+pad+' '+(h-pad)+'Z';
+  var sec='';
+  if(secondary){var min2=Math.min.apply(null,secondary),max2=Math.max.apply(null,secondary);var bw=(w-pad*2)/secondary.length;secondary.forEach(function(v,i){var bh=(v/(max2||1))*(h-8);sec+='<rect x="'+(pad+i*bw).toFixed(1)+'" y="'+(h-pad-bh).toFixed(1)+'" width="'+Math.max(1,bw-1).toFixed(1)+'" height="'+bh.toFixed(1)+'" fill="rgba(66,215,255,.28)"/>'})}
+  return '<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'+sec+'<path d="'+area+'" fill="'+fill+'"/><path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="1.4"/></svg>';
+}
+function openDrawer(name){
+  if(!CITY[name])return;
+  state.city=name;
+  if(state.playing){state.playing=false;if(state.timer)clearInterval(state.timer);$('#play').textContent='▶'}
+  updateMap();drawForecast();drawHorizon();drawRanking();updateHorizonStat();
+  drawDrawer();
+  $('#drawer-mask').classList.add('on');$('#city-drawer').classList.add('open');$('#city-drawer').setAttribute('aria-hidden','false');
+  document.body.classList.add('drawer-open');
+  try{$('#drawer-close').focus()}catch(e){}
+  updateURL();
+}
+function closeDrawer(){
+  $('#drawer-mask').classList.remove('on');$('#city-drawer').classList.remove('open');$('#city-drawer').setAttribute('aria-hidden','true');
+  document.body.classList.remove('drawer-open');
+}
+function drawDrawer(){
+  var name=state.city;if(!name||!CITY[name])return;
+  var i=state.idx,s=SERIES[name],c=CITY[name];
+  var vals=DATA.meta.cities.map(function(x){return SERIES[x.name].casesSmooth[i]||0});
+  var arr=DATA.meta.cities.map(function(x){return {name:x.name,v:SERIES[x.name].casesSmooth[i]||0}}).sort(function(a,b){return b.v-a.v});
+  var rank=arr.findIndex(function(x){return x.name===name})+1;
+  var d7=(s.casesSmooth[i]||0)-(s.casesSmooth[Math.max(0,i-7)]||0);
+  var m=FIT.metrics.cities[name];
+  $('#drawer-city').textContent=name;
+  $('#drawer-sub').textContent=DATA.meta.dates[i]+' · 全省第 '+rank+' / 11 · '+c.neighbors.length+' 个接壤城市';
+  $('#drawer-stats').innerHTML=
+    drawerStat('7 日平滑病例',fmt(s.casesSmooth[i],1)+' 例')+
+    drawerStat('7 日变化',(d7>=0?'+':'')+fmt(d7,1)+' 例',d7>=0?'up':'down')+
+    drawerStat('日均气温',fmt(s.tavg[i],1)+' °C')+
+    drawerStat('相对湿度',fmt(s.rh[i],0)+' %')+
+    drawerStat('绝对湿度',fmt(s.AH[i],1)+' g/m³')+
+    drawerStat('降水量',fmt(s.precip[i],1)+' mm');
+  var start=Math.max(0,i-59),raw=[],smooth=[],tavg=[],precip=[];
+  for(var k=start;k<=i;k++){raw.push(s.casesRaw[k]||0);smooth.push(s.casesSmooth[k]||0);tavg.push(s.tavg[k]||0);precip.push(s.precip[k]||0)}
+  $('#drawer-trend').innerHTML=drawerChart(raw,'rgba(156,190,210,.55)','rgba(156,190,210,.06)',null).replace('</svg>','')+'<path d="'+smooth.reduce(function(acc,v,j){var n=smooth.length;var x=2+j/(n-1)*406;var mn=Math.min.apply(null,smooth),mx=Math.max.apply(null,smooth);var y=74-2-(v-mn)/(mx-mn||1)*70;return acc+(j?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)},'')+'" fill="none" stroke="#42d7ff" stroke-width="1.8"/></svg>';
+  $('#drawer-weather-chart').innerHTML=drawerChart(tavg,'#7cebd8','rgba(80,235,210,.10)',precip).replace('</svg>','')+
+    '<text x="4" y="10" fill="#5e91ac" font-size="8">气温 °C / 降水柱</text></svg>';
+  $('#drawer-metrics').innerHTML=
+    '<div class="drawer-metric"><span>全期 RMSE</span><b>'+fmt(m.allRmse,3)+'</b></div>'+
+    '<div class="drawer-metric"><span>全期 MAE</span><b>'+fmt(m.allMae,3)+'</b></div>'+
+    '<div class="drawer-metric"><span>全期 PCC</span><b>'+fmt(m.allPcc,3)+'</b></div>'+
+    '<div class="drawer-metric"><span>第 '+state.horizon+' 步 RMSE</span><b>'+fmt(m.rmseH[state.horizon-1],3)+'</b></div>';
+  $('#drawer-neighbors').innerHTML=c.neighbors.map(function(n){return '<button data-name="'+n+'">'+CITY[n].short+'</button>'}).join('');
+  $$('#drawer-neighbors button').forEach(function(b){b.addEventListener('click',function(){openDrawer(b.getAttribute('data-name'))})});
+  $('#drawer-explore').href='explore.html?date='+DATA.meta.dates[i]+'&city='+encodeURIComponent(name);
+}
+function downloadCSV(){
+  var name=state.city;if(!name)return;var s=SERIES[name];
+  var rows=['date,cases_raw,cases_smooth,tavg,rh,AH,precip'];
+  DATA.meta.dates.forEach(function(d,i){rows.push([d,s.casesRaw[i],s.casesSmooth[i],s.tavg[i],s.rh[i],s.AH[i],s.precip[i]].join(','))});
+  var blob=new Blob(['\ufeff'+rows.join('\n')],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name+'_2015_2019.csv';a.click();URL.revokeObjectURL(a.href);
+}
+/* ---------- help / fullscreen ---------- */
+function openHelp(){$('#help-mask').classList.add('on');$('#help-modal').classList.add('open');$('#help-modal').setAttribute('aria-hidden','false');try{$('#help-close').focus()}catch(e){}}
+function closeHelp(){$('#help-mask').classList.remove('on');$('#help-modal').classList.remove('open');$('#help-modal').setAttribute('aria-hidden','true')}
+function toggleFull(){if(!document.fullscreenElement){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()}else{document.exitFullscreen&&document.exitFullscreen()}}
+/* ---------- boot ---------- */
 function boot(){
   fitScreen();
   Promise.all([
@@ -336,18 +436,42 @@ function boot(){
   ]).then(function(res){
     DATA=res[0];GEO=res[1];FIT=res[2];PROV=DATA.meta.province;
     DATA.meta.cities.forEach(function(c){CITY[c.name]=c;SERIES[c.name]=DATA.series[c.name]});
-    var max=-Infinity,idx=0;
-    PROV.casesSmoothSum.forEach(function(v,i){if(v>max){max=v;idx=i}});
-    state.idx=idx;$('#slider').value=idx;
+    var q=new URLSearchParams(location.search);
+    var max=-Infinity,idx=0;PROV.casesSmoothSum.forEach(function(v,i){if(v>max){max=v;idx=i}});
+    state.idx=idx;
+    if(q.get('date')){var qi=DATA.meta.dates.indexOf(q.get('date'));if(qi>=0)state.idx=qi}
+    if(['cases','precip','tavg'].indexOf(q.get('mode'))>=0)state.mode=q.get('mode');
+    if(q.get('horizon'))state.horizon=clamp(parseInt(q.get('horizon'),10)||1,1,12);
+    state.city=q.get('city')&&CITY[q.get('city')]?q.get('city'):null;
     projectSetup();buildMap();updateAll();
-    var top=DATA.meta.cities.map(function(c){return {name:c.name,v:SERIES[c.name].casesSmooth[idx]||0}}).sort(function(a,b){return b.v-a.v})[0];
-    if(top){state.city=top.name;updateMap();drawForecast();drawHorizon();drawRanking();var h=$('.p-forecast .panel-h h2');if(h)h.textContent='模型预测 · '+CITY[top.name].short;}
+    if(!state.city){var top=DATA.meta.cities.map(function(c){return {name:c.name,v:SERIES[c.name].casesSmooth[state.idx]||0}}).sort(function(a,b){return b.v-a.v})[0];state.city=top.name}
+    updateMap();drawForecast();drawHorizon();drawRanking();updateAll();
+    var h=$('.p-forecast .panel-h h2');if(h)h.textContent='模型预测 · '+CITY[state.city].short;
+    if(q.get('city'))openDrawer(state.city);
+    $('#loading').classList.add('hide');
     setInterval(function(){var d=new Date();$('#clock').textContent=d.toTimeString().slice(0,8)},1000);
-  }).catch(function(err){console.error(err);document.body.innerHTML='<pre style="color:#f88;padding:30px">数据加载失败：'+err+'</pre>'});
-  var slider=$('#slider');
-  slider.addEventListener('input',function(){state.idx=+slider.value;updateAll()});
+  }).catch(function(err){console.error(err);var ld=$('#loading');if(ld){ld.innerHTML='<span style="color:#ff8f9e">数据加载失败：'+String(err).slice(0,80)+'</span>'}});
+  $('#slider').addEventListener('input',function(){state.idx=+this.value;updateAll()});
+  $('#date-pick').addEventListener('change',function(){var i=DATA.meta.dates.indexOf(this.value);if(i>=0){state.idx=i;updateAll()}});
   $('#play').addEventListener('click',playToggle);
+  $('#prev').addEventListener('click',function(){step(-1)});
+  $('#next').addEventListener('click',function(){step(1)});
   $('#speed').addEventListener('change',function(){state.speed=+this.value;if(state.playing){clearInterval(state.timer);state.timer=setInterval(function(){step(1)},1000/state.speed)}});
-  $$('#map-tabs button').forEach(function(b){b.addEventListener('click',function(){$$('#map-tabs button').forEach(function(x){x.classList.remove('on')});b.classList.add('on');state.mode=b.getAttribute('data-mode');updateAll()})});
+  $$('#map-tabs button').forEach(function(b){b.addEventListener('click',function(){setMode(b.getAttribute('data-mode'))})});
+  $('#toggle-edges').addEventListener('click',function(){state.edges=!state.edges;this.classList.toggle('on',state.edges);$('#map').classList.toggle('hide-edges',!state.edges)});
+  $('#toggle-labels').addEventListener('click',function(){state.labels=!state.labels;this.classList.toggle('on',state.labels);$('#map').classList.toggle('hide-values',!state.labels)});
+  $('#horizon-select').addEventListener('click',function(ev){var b=ev.target.closest('button');if(!b)return;state.horizon=+b.getAttribute('data-h');drawHorizon();updateURL();if($('#city-drawer').classList.contains('open'))drawDrawer()});
+  $('#btn-help').addEventListener('click',openHelp);$('#help-close').addEventListener('click',closeHelp);$('#help-mask').addEventListener('click',closeHelp);
+  $('#btn-full').addEventListener('click',toggleFull);
+  $('#drawer-close').addEventListener('click',closeDrawer);$('#drawer-mask').addEventListener('click',closeDrawer);$('#drawer-csv').addEventListener('click',downloadCSV);
+  document.addEventListener('keydown',function(ev){
+    var tag=(ev.target&&ev.target.tagName||'').toLowerCase();
+    if(tag==='input'||tag==='select'||tag==='textarea')return;
+    if(ev.key==='Escape'){closeHelp();closeDrawer();return}
+    if(ev.code==='Space'){ev.preventDefault();playToggle();return}
+    if(ev.key==='ArrowLeft'){ev.preventDefault();step(-1)}
+    if(ev.key==='ArrowRight'){ev.preventDefault();step(1)}
+  });
+  fitScreen();
 }
 boot();
