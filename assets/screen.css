@@ -187,21 +187,87 @@ body{display:block;position:relative}
 .horizon-wrap>span{display:block;font-size:9px;color:#5a89a4;letter-spacing:.08em;margin-bottom:3px}
 .horizon-chart{height:63px}
 .horizon-chart svg{width:100%;height:100%;display:block}
-/* compact vertical mode for 16:10 browser viewports; still fills width */
-body.compact{--head-h:76px;--foot-h:34px;--timeline-h:104px;--map-head-h:52px}
-body.compact .screen-head{padding-top:6px}
-body.compact .head-left{padding-top:5px}
-body.compact .title-kicker{margin-bottom:2px}
-body.compact .head-title h1{font-size:28px}
-body.compact .title-line{margin-top:5px}
-body.compact .screen-grid{padding-top:0}
-body.compact .col-left{grid-template-rows:200px minmax(0,1fr) 186px}
-body.compact .col-right{grid-template-rows:minmax(0,1fr) 220px 170px}
-body.compact .rank-row{height:20.5px}
-body.compact .rank-list{gap:2px}
-body.compact .rank-summary{min-height:62px;margin-top:4px;padding:5px 8px}
-body.compact .rank-donut{width:46px;height:46px}
-body.compact .forecast-chart{height:170px}
-body.compact .horizon-wrap{margin-bottom:6px}
-body.compact .brief-body{padding-top:8px}
-body.compact .screen-foot{font-size:9px}
+/* ============ FLUID FULL-VIEWPORT LAYOUT (no page transform, no letterbox) ============ */
+:root{
+  --head-h:clamp(64px,8.55vh,92px);
+  --foot-h:clamp(30px,4.05vh,44px);
+  --col-w:clamp(330px,21.3vw,410px);
+  --gap:clamp(9px,.78vw,15px);
+  --pad:clamp(12px,1.25vw,24px);
+  --timeline-h:clamp(86px,11.7vh,128px);
+  --map-head-h:clamp(46px,5.65vh,62px);
+}
+html,body{width:100vw;height:100vh;overflow:hidden}
+body{display:block;position:relative}
+#screen{width:100vw!important;height:100vh!important;position:absolute!important;left:0!important;top:0!important;transform:none!important;transform-origin:top left!important}
+.screen-head{height:var(--head-h);padding-top:clamp(4px,.85vh,10px)}
+.screen-grid{height:calc(100vh - var(--head-h) - var(--foot-h));grid-template-columns:var(--col-w) minmax(0,1fr) var(--col-w);gap:var(--gap);padding:0 var(--pad)}
+.screen-foot{height:var(--foot-h);padding:0 var(--pad)}
+.map-head{height:var(--map-head-h)}
+.timeline{height:var(--timeline-h);padding-top:clamp(5px,.9vh,9px);grid-template-columns:clamp(170px,11vw,210px) minmax(0,1fr) clamp(110px,6.6vw,126px);grid-template-rows:clamp(28px,3.4vh,34px) 1fr}
+.province-spark{height:calc(var(--timeline-h) - clamp(62px,7.3vh,74px));min-height:0}
+.col-left{grid-template-rows:clamp(170px,21.8vh,200px) minmax(0,1fr) clamp(160px,20.8vh,190px)}
+.col-right{grid-template-rows:minmax(0,1fr) clamp(198px,23.6vh,248px) clamp(150px,18.6vh,194px)}
+.head-title h1{font-size:clamp(24px,1.62vw,31px)}
+.title-kicker{font-size:clamp(8px,.52vw,10px)}
+.sys-tag{font-size:clamp(10px,.62vw,12px)}
+.sys-sub{font-size:clamp(9px,.55vw,11px)}
+.head-nav{font-size:clamp(9.5px,.58vw,11px)}
+.clock b{font-size:clamp(15px,.92vw,18px)}
+.clock span{font-size:clamp(9px,.55vw,11px)}
+.panel-h{height:clamp(32px,4.2vh,38px);padding:0 clamp(10px,.75vw,14px)}
+.panel-h h2{font-size:clamp(13px,.84vw,16px)}
+.panel-h em{font-size:clamp(7.5px,.49vw,9.5px)}
+.metric-grid{padding:clamp(7px,.85vh,11px) clamp(8px,.65vw,12px)}
+.metric{padding:clamp(5px,.7vh,8px) clamp(6px,.55vw,10px)}
+.metric span{font-size:clamp(9px,.57vw,11px)}
+.metric b{font-size:clamp(20px,1.35vw,26px)}
+.metric small{font-size:clamp(8px,.52vw,10px)}
+.rank-head{font-size:clamp(8px,.5vw,9.5px)}
+.rank-row{height:clamp(19px,2.55vh,25.5px);font-size:clamp(10px,.6vw,11.5px);grid-template-columns:18px 40px minmax(0,1fr) 46px;gap:5px}
+.rank-summary{margin:clamp(4px,.55vh,7px) clamp(8px,.75vw,14px) 0;padding:clamp(5px,.7vh,9px) clamp(6px,.55vw,10px)}
+.rank-donut{width:clamp(42px,3.2vw,58px);height:clamp(42px,3.2vw,58px)}
+.rank-sum-txt span{font-size:clamp(8px,.52vw,9.5px)}
+.rank-sum-txt b{font-size:clamp(9.5px,.58vw,11px)}
+.weather-row{padding:clamp(6px,.8vh,10px) clamp(8px,.65vw,12px) 4px;gap:clamp(5px,.45vw,8px)}
+.weather-k{padding:clamp(4px,.55vh,6px) clamp(5px,.45vw,8px)}
+.weather-k span{font-size:clamp(8px,.5vw,9.5px)}
+.weather-k b{font-size:clamp(13px,.84vw,16px)}
+.spark{height:clamp(44px,6.3vh,66px)}
+.panel-note{font-size:clamp(8px,.52vw,9.5px);margin:clamp(3px,.45vh,5px) clamp(8px,.75vw,14px) 0}
+.map-title span{font-size:clamp(14px,.9vw,17px)}
+.map-title b{font-size:clamp(9px,.58vw,11px)}
+.map-tabs button{font-size:clamp(9.5px,.58vw,11px);padding:4px clamp(8px,.65vw,12px)}
+.map-legend{font-size:clamp(9px,.55vw,10.5px);left:clamp(12px,1vw,22px);bottom:clamp(10px,.85vh,20px)}
+.map-status{font-size:clamp(9px,.55vw,10.5px);right:clamp(12px,1vw,22px);bottom:clamp(10px,.85vh,18px)}
+.tl-time b{font-size:clamp(10px,.65vw,12px)}
+.tl-time span{font-size:clamp(8px,.5vw,9.5px)}
+#speed{font-size:clamp(8.5px,.52vw,10px)}
+.tl-right{font-size:clamp(8px,.48vw,9px)}
+.chart-legend{font-size:clamp(8px,.52vw,9.5px);padding-top:clamp(5px,.7vh,8px)}
+.forecast-chart{height:clamp(155px,22.5vh,205px)}
+.forecast-metrics span{font-size:clamp(7.5px,.47vw,8.5px)}
+.forecast-metrics b{font-size:clamp(12px,.8vw,15px)}
+.horizon-wrap>span{font-size:clamp(9px,.55vw,10px)}
+.horizon-chart{height:clamp(48px,6.8vh,63px)}
+.brief-body b{font-size:clamp(11px,.67vw,12.5px)}
+.brief-body p{font-size:clamp(9px,.55vw,10.5px)}
+.brief-foot{font-size:clamp(8px,.48vw,9px)}
+.screen-foot{font-size:clamp(8px,.52vw,10px)}
+
+@media (max-height:960px){
+  .col-left{grid-template-rows:190px minmax(0,1fr) 178px}
+  .col-right{grid-template-rows:minmax(0,1fr) 202px 166px}
+  .rank-row{height:19.5px;gap:2px}
+  .rank-summary{min-height:56px;padding:4px 8px}
+  .rank-donut{width:42px;height:42px}
+  .forecast-chart{height:150px}
+  .horizon-chart{height:46px}
+  .brief-body p{line-height:1.55}
+}
+@media (max-width:1500px){
+  :root{--col-w:clamp(300px,22vw,340px);--gap:10px;--pad:14px}
+  .head-title h1{font-size:clamp(22px,1.7vw,27px)}
+  .metric b{font-size:clamp(19px,1.5vw,23px)}
+  .rank-row{font-size:10.5px}
+}

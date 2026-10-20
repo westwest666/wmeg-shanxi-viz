@@ -32,7 +32,7 @@ function cityValueText(name,i){
   return fmt(v,1)+' 例';
 }
 function modeName(){return {cases:'7 日平滑病例',precip:'降水量',tavg:'日均气温'}[state.mode]}
-function fitScreen(){var s=innerWidth/1920;var designH=innerHeight/s;document.documentElement.style.setProperty('--design-h',designH.toFixed(2)+'px');document.body.classList.toggle('compact',designH<1000);$('#screen').style.transform='scale('+s+')'}
+function fitScreen(){document.body.classList.toggle('compact',innerHeight<960)}
 window.addEventListener('resize',fitScreen);
 
 function projectSetup(){
