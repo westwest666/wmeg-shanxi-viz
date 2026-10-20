@@ -46,7 +46,7 @@ function projectSetup(){
   });
   var minx=Infinity,maxx=-Infinity,miny=Infinity,maxy=-Infinity;
   coords.forEach(function(c){minx=Math.min(minx,c[0]);maxx=Math.max(maxx,c[0]);miny=Math.min(miny,c[1]);maxy=Math.max(maxy,c[1])});
-  var pad=52,W=780,H=610;
+  var pad=32,W=900,H=760;
   var sc=Math.min((W-pad*2)/(maxx-minx),(H-pad*2)/(maxy-miny));
   var ox=(W-(maxx-minx)*sc)/2,oy=(H-(maxy-miny)*sc)/2;
   MAP={W:W,H:H,project:function(lon,lat){return [ox+(lon-minx)*sc,oy+(maxy-lat)*sc]},bounds:{minx:minx,maxx:maxx,miny:miny,maxy:maxy}};
@@ -73,9 +73,26 @@ function buildMap(){
   var merge=svgEl('feMerge');merge.appendChild(svgEl('feMergeNode',{in:'b'}));merge.appendChild(svgEl('feMergeNode',{in:'SourceGraphic'}));
   glow.appendChild(blur);glow.appendChild(merge);defs.appendChild(glow);
   svg.appendChild(defs);
-  svg.appendChild(svgEl('rect',{x:0,y:0,width:780,height:610,fill:'url(#mapBg)'}));
-  // grid rings
-  [[150,1],[260,1],[370,1]].forEach(function(r){svg.appendChild(svgEl('circle',{cx:390,cy:300,r:r[0],class:'map-ring'}))});
+  svg.appendChild(svgEl('rect',{x:0,y:0,width:900,height:760,fill:'url(#mapBg)'}));
+  // circular HUD: rings, ticks, rotating sweep, cardinal annotations
+  var gHud=svgEl('g',{class:'hud-rings'});
+  [110,205,292,350].forEach(function(r,idx){gHud.appendChild(svgEl('circle',{cx:450,cy:380,r:r,class:'map-ring',opacity:idx===3?'.95':'.55',stroke:idx===3?'rgba(66,215,255,.40)':'rgba(66,215,255,.075)','stroke-width':idx===3?'1.2':'0.8','stroke-dasharray':idx===3?'3 7':'none'}))});
+  var spokes=svgEl('g',{stroke:'rgba(66,215,255,.09)','stroke-width':'.7'});
+  for(var si=0;si<12;si++){var sa=si/12*Math.PI*2;var sr1=115,sr2=350;spokes.appendChild(svgEl('line',{x1:(450+Math.cos(sa)*sr1).toFixed(1),y1:(380+Math.sin(sa)*sr1).toFixed(1),x2:(450+Math.cos(sa)*sr2).toFixed(1),y2:(380+Math.sin(sa)*sr2).toFixed(1)}))}
+  gHud.appendChild(spokes);
+  var tick=svgEl('g',{stroke:'rgba(66,215,255,.28)','stroke-width':'.7'});
+  for(var ti=0;ti<72;ti++){var ang=ti/72*Math.PI*2;var r1=ti%6===0?340:347;var r2=356;var x1=450+Math.cos(ang)*r1,y1=380+Math.sin(ang)*r1,x2=450+Math.cos(ang)*r2,y2=380+Math.sin(ang)*r2;tick.appendChild(svgEl('line',{x1:x1.toFixed(1),y1:y1.toFixed(1),x2:x2.toFixed(1),y2:y2.toFixed(1)}))}
+  gHud.appendChild(tick);
+  var sweep=svgEl('g',{opacity:'.5'});
+  var wedge=svgEl('path',{d:'M450 380 L450 40 A340 340 0 0 1 678 163 Z',fill:'rgba(66,215,255,.045)',stroke:'rgba(66,215,255,.12)','stroke-width':'.6'});
+  sweep.appendChild(wedge);
+  var anim=svgEl('animateTransform',{attributeName:'transform',type:'rotate',from:'0 450 380',to:'360 450 380',dur:'26s',repeatCount:'indefinite'});
+  sweep.appendChild(anim);gHud.appendChild(sweep);
+  function hudText(x,y,t,anchor,size){var tx=svgEl('text',{x:x,y:y,'text-anchor':anchor||'start',fill:'rgba(125,191,214,.55)','font-size':size||'9','letter-spacing':'1.4'});tx.textContent=t;gHud.appendChild(tx)}
+  hudText(80,350,'11 CITIES');hudText(80,366,'11 地级市');hudText(820,350,'19 EDGES','end');hudText(820,366,'19 对无向边','end');
+  hudText(80,414,'W = 20');hudText(80,430,'输入窗口');hudText(820,414,'H = 12','end');hudText(820,430,'预测步长','end');
+  hudText(450,46,'SHANXI · 山西','middle','10');hudText(450,726,'WMEG-Net / SPATIOTEMPORAL FORECAST','middle','8');
+  svg.appendChild(gHud);
   // edges
   var gEdges=svgEl('g');
   var seen={};
@@ -139,6 +156,8 @@ function selectCity(name){
   state.city=name;
   updateMap();
   drawForecast();
+  drawHorizon();
+  drawRanking();
   var h=$('.p-forecast .panel-h h2'); if(h)h.textContent='模型预测 · '+CITY[name].short;
 }
 function updateMap(){
@@ -178,6 +197,11 @@ function drawRanking(){
       '<span class="bar"><i style="width:'+w+'%"></i></span><span class="vl">'+fmt(d.v,1)+'</span></div>';
   }).join('');
   $$('#rank .rank-row').forEach(function(r){r.addEventListener('click',function(){selectCity(r.getAttribute('data-name'))})});
+  var total=arr.reduce(function(s,d){return s+d.v},0)||1;
+  var top3=arr.slice(0,3).reduce(function(s,d){return s+d.v},0);
+  var pct=Math.round(top3/total*100);
+  $('#rank-summary').innerHTML='<div class="rank-donut" style="background:conic-gradient(#3fe0d0 0 '+pct+'%,#ffbd5a '+pct+'% '+(pct+15)+'%,#256b88 '+(pct+15)+'% 100%)"><b>'+pct+'%</b></div>'+
+    '<div class="rank-sum-txt"><span>TOP 3 SHARE / 集中度</span><b>前 3 城占全省 '+pct+'%<br>'+arr[0].short+'、'+arr[1].short+'、'+arr[2].short+' 为当前高位</b></div>';
 }
 function updateMetrics(){
   var i=state.idx;
@@ -266,8 +290,23 @@ function drawError(){
   });
   $('#error-chart').innerHTML='<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'+bars+'</svg>';
 }
+function drawHorizon(){
+  var name=state.city||'临汾市';
+  var m=FIT.metrics.cities[name]||FIT.metrics.cities['临汾市'];
+  if(!m||!m.rmseH){$('#horizon-chart').innerHTML='';return}
+  var vals=m.rmseH,w=370,h=58,left=0,bottom=14,top=6,bw=(w-4)/vals.length-2;
+  var max=Math.max.apply(null,vals);
+  var bars='';
+  vals.forEach(function(v,i){
+    var bh=(v/max)*(h-top-bottom);var x=2+i*((w-4)/vals.length);var y=h-bottom-bh;
+    var col=i<2?'#35e0c8':(i<6?'#28bdda':'#2d8fb0');
+    bars+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(1,bh).toFixed(1)+'" fill="'+col+'" opacity=".9"/>';
+    if(i===0||i===5||i===11)bars+='<text x="'+(x+bw/2).toFixed(1)+'" y="'+(h-3)+'" fill="#527f99" font-size="8" text-anchor="middle">'+(i+1)+'</text>';
+  });
+  $('#horizon-chart').innerHTML='<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'+bars+'</svg>';
+}
 function updateAll(){
-  updateMap();drawRanking();updateMetrics();drawWeatherSpark();drawForecast();drawError();
+  updateMap();drawRanking();updateMetrics();drawWeatherSpark();drawForecast();drawError();drawHorizon();
 }
 function step(dir){
   state.idx=(state.idx+dir+1826)%1826;
@@ -294,7 +333,7 @@ function boot(){
     state.idx=idx;$('#slider').value=idx;
     projectSetup();buildMap();updateAll();
     var top=DATA.meta.cities.map(function(c){return {name:c.name,v:SERIES[c.name].casesSmooth[idx]||0}}).sort(function(a,b){return b.v-a.v})[0];
-    if(top){state.city=top.name;updateMap();drawForecast();var h=$('.p-forecast .panel-h h2');if(h)h.textContent='模型预测 · '+CITY[top.name].short;}
+    if(top){state.city=top.name;updateMap();drawForecast();drawHorizon();drawRanking();var h=$('.p-forecast .panel-h h2');if(h)h.textContent='模型预测 · '+CITY[top.name].short;}
     setInterval(function(){var d=new Date();$('#clock').textContent=d.toTimeString().slice(0,8)},1000);
   }).catch(function(err){console.error(err);document.body.innerHTML='<pre style="color:#f88;padding:30px">数据加载失败：'+err+'</pre>'});
   var slider=$('#slider');
