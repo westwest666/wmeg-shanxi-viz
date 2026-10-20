@@ -383,3 +383,30 @@ body{display:block;position:relative}
 }
 .alert-chip{cursor:pointer}
 .alert-chip:hover{border-color:rgba(255,209,102,.65)}
+/* error state */
+.load-error{text-align:center;padding:22px 26px;border:1px solid rgba(255,93,115,.35);background:rgba(25,8,14,.72);max-width:420px}
+.load-error b{display:block;color:#ffb0bb;font-size:15px;margin-bottom:7px}
+.load-error p{color:#9c7f8b;font-size:11px;line-height:1.6;margin:0 0 12px;word-break:break-all}
+.load-error button,.load-error a{display:inline-block;margin:0 4px;padding:5px 10px;border:1px solid rgba(66,215,255,.35);background:rgba(8,30,48,.8);color:#a9dcec;font-family:inherit;font-size:11px;cursor:pointer;text-decoration:none}
+/* map legend gradient matches js palette */
+.map-legend .bar{background:linear-gradient(90deg,#082231,#09384c,#0e647a,#22acb6,#c49644,#ffbe62)}
+/* 1366 / short viewport: keep all primary content visible */
+@media (max-width:1450px),(max-height:800px){
+  .col-left{grid-template-rows:175px minmax(0,1fr) 160px}
+  .col-right{grid-template-rows:minmax(0,1fr) 180px 150px}
+  .rank-summary{display:none}
+  .rank-row{height:17.5px;font-size:10px;gap:3px}
+  .rank-head{padding-top:4px;font-size:8.5px}
+  .rank-list{gap:1px;padding-bottom:4px}
+  .forecast-chart{height:110px}
+  .horizon-chart{height:32px}
+  .horizon-select{font-size:8px;gap:3px}
+  .horizon-select button{font-size:8px;padding:1px 3px}
+  .horizon-select em{font-size:8px}
+  .error-chart{height:120px}
+  .brief-body{padding-top:4px}
+  .brief-body p{font-size:8.5px;line-height:1.4}
+  .brief-foot{padding:3px 14px}
+  .forecast-metrics div{padding:4px 5px}
+  .weather-row{padding-top:5px}
+}

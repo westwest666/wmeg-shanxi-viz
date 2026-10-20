@@ -1,8 +1,9 @@
 'use strict';
 /* CENI-style big screen · data-driven */
 var DATA=null, GEO=null, FIT=null, MECH=null, CITY_Q90={};
+var START_IDX=6;
 var CITY={}, SERIES={}, PROV={};
-var state={idx:0,mode:'cases',city:null,playing:false,speed:10,timer:null,horizon:1,edges:true,labels:true};
+var state={idx:6,mode:'cases',city:null,playing:false,speed:10,timer:null,horizon:1,edges:true,labels:true};
 var MAP=null;
 var NS='http://www.w3.org/2000/svg';
 
@@ -21,9 +22,9 @@ function colorScale(v,min,max){
   return 'rgb('+Math.round(a[0]+(b[0]-a[0])*u)+','+Math.round(a[1]+(b[1]-a[1])*u)+','+Math.round(a[2]+(b[2]-a[2])*u)+')';
 }
 function colorDomain(){
-  if(state.mode==='cases')return [0,40];
-  if(state.mode==='precip')return [0,20];
-  return [-10,30];
+  if(state.mode==='cases')return [0,50];
+  if(state.mode==='precip')return [0,30];
+  return [-20,30];
 }
 function quantile(arr,q){
   var a=arr.filter(function(v){return v!==null&&v!==undefined&&!isNaN(v)}).slice().sort(function(x,y){return x-y});
@@ -114,7 +115,7 @@ function buildMap(){
   var seen={};
   DATA.meta.cities.forEach(function(c){
     c.neighbors.forEach(function(n){
-      var key=[c.short,n].sort().join('|');
+      var key=[c.name,n].sort().join('|');
       if(seen[key])return;seen[key]=1;
       var b=CITY[n];if(!b)return;
       var p1=MAP.project(c.lon,c.lat),p2=MAP.project(b.lon,b.lat);
@@ -192,7 +193,7 @@ function updateMap(){
     var name=g.getAttribute('data-name');var v=cityValue(name,i);
     var val=g.querySelector('.city-val');if(val)val.textContent=(topNames.indexOf(name)>=0||state.city===name)?cityValueText(name,i):'';
     var core=g.querySelector('.node-core');var ring=g.querySelector('.node-ring');
-    var rad=3.2+Math.sqrt(Math.max(0,v)/(max||1))*5.4;
+    var dm=colorDomain();var norm=clamp((v-dm[0])/(dm[1]-dm[0]),0,1);var rad=3.2+Math.sqrt(norm)*5.4;
     if(core)core.setAttribute('r',rad.toFixed(2));
     if(ring)ring.setAttribute('r',(rad+3.6).toFixed(2));
     if(state.city===name){g.style.filter='drop-shadow(0 0 10px #bffaff)'}else{g.style.filter=''}
@@ -200,7 +201,7 @@ function updateMap(){
   $('#map-date').textContent=DATA.meta.dates[i];
   var lg=$('#map-legend');
   var unit=state.mode==='cases'?' 例':(state.mode==='precip'?' mm':' °C');
-  lg.innerHTML='<span>'+modeName()+' · 固定色阶</span><i class="bar"></i><span>'+fmt(min,0)+' — '+fmt(max,0)+unit+'</span>';
+  lg.innerHTML='<span>'+modeName()+' · 固定色阶</span><i class="bar"></i><span>'+fmt(min,0)+' — '+fmt(max,0)+unit+' · 超限饱和</span>';
 }
 function drawRanking(){
   var i=state.idx;
@@ -367,9 +368,9 @@ function updateAll(){
   updateURL();
 }
 function step(dir){
-  state.idx=(state.idx+dir+1826)%1826;
-  $('#slider').value=state.idx;
-  updateAll();
+  var nxt=state.idx+dir;
+  if(nxt<START_IDX||nxt>=DATA.meta.ndays){if(state.playing)playToggle();return}
+  state.idx=nxt;$('#slider').value=state.idx;updateAll();
 }
 function playToggle(){
   state.playing=!state.playing;
@@ -396,19 +397,35 @@ function drawerChart(values,color,fill,secondary){
   if(secondary){var min2=Math.min.apply(null,secondary),max2=Math.max.apply(null,secondary);var bw=(w-pad*2)/secondary.length;secondary.forEach(function(v,i){var bh=(v/(max2||1))*(h-8);sec+='<rect x="'+(pad+i*bw).toFixed(1)+'" y="'+(h-pad-bh).toFixed(1)+'" width="'+Math.max(1,bw-1).toFixed(1)+'" height="'+bh.toFixed(1)+'" fill="rgba(66,215,255,.28)"/>'})}
   return '<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'+sec+'<path d="'+area+'" fill="'+fill+'"/><path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="1.4"/></svg>';
 }
+function trapFocus(ev){
+  var box=$('#help-modal').classList.contains('open')?$('#help-modal'):($('#city-drawer').classList.contains('open')?$('#city-drawer'):null);
+  if(!box)return false;
+  var f=$$('#help-modal button, #help-modal a, #help-modal input, #city-drawer button, #city-drawer a, #city-drawer input').filter(function(el){return el.offsetParent!==null&&!el.disabled});
+  if(!f.length)return false;
+  var first=f[0],last=f[f.length-1];
+  if(ev.shiftKey&&document.activeElement===first){ev.preventDefault();last.focus();return true}
+  if(!ev.shiftKey&&document.activeElement===last){ev.preventDefault();first.focus();return true}
+  return false;
+}
+function drawerDualChart(raw,smooth,w,h){
+  w=w||410;h=h||74;var pad=2;var all=raw.concat(smooth);var mn=Math.min.apply(null,all),mx=Math.max.apply(null,all);var span=mx-mn||1;
+  function path(a){return a.map(function(v,i){var x=pad+i/(a.length-1)*(w-pad*2);var y=h-pad-(v-mn)/span*(h-pad*2);return (i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)}).join('')}
+  var d=path(smooth);var area=d+'L'+(w-pad)+' '+(h-pad)+'L'+pad+' '+(h-pad)+'Z';
+  return '<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none"><path d="'+area+'" fill="rgba(66,215,255,.08)"/><path d="'+path(raw)+'" fill="none" stroke="rgba(156,190,210,.5)" stroke-width="1"/><path d="'+d+'" fill="none" stroke="#42d7ff" stroke-width="1.7"/></svg>';
+}
 function openDrawer(name){
   if(!CITY[name])return;
   state.city=name;
   if(state.playing){state.playing=false;if(state.timer)clearInterval(state.timer);$('#play').textContent='▶'}
   updateMap();drawForecast();drawHorizon();drawRanking();updateHorizonStat();
   drawDrawer();
-  $('#drawer-mask').classList.add('on');$('#city-drawer').classList.add('open');$('#city-drawer').setAttribute('aria-hidden','false');
+  $('#drawer-mask').classList.add('on');$('#city-drawer').classList.add('open');$('#city-drawer').setAttribute('aria-hidden','false');$('#city-drawer').inert=false;
   document.body.classList.add('drawer-open');
   try{$('#drawer-close').focus()}catch(e){}
   updateURL();
 }
 function closeDrawer(){
-  $('#drawer-mask').classList.remove('on');$('#city-drawer').classList.remove('open');$('#city-drawer').setAttribute('aria-hidden','true');
+  $('#drawer-mask').classList.remove('on');$('#city-drawer').classList.remove('open');$('#city-drawer').setAttribute('aria-hidden','true');$('#city-drawer').inert=true;
   document.body.classList.remove('drawer-open');
 }
 function drawDrawer(){
@@ -419,6 +436,7 @@ function drawDrawer(){
   var rank=arr.findIndex(function(x){return x.name===name})+1;
   var d7=(s.casesSmooth[i]||0)-(s.casesSmooth[Math.max(0,i-7)]||0);
   var m=FIT.metrics.cities[name];
+  var fh=$('.p-forecast .panel-h h2');if(fh)fh.textContent='模型预测 · '+CITY[name].short;
   $('#drawer-city').textContent=name;
   $('#drawer-sub').textContent=DATA.meta.dates[i]+' · 全省第 '+rank+' / 11 · '+c.neighbors.length+' 个接壤城市';
   $('#drawer-stats').innerHTML=
@@ -430,7 +448,7 @@ function drawDrawer(){
     drawerStat('降水量',fmt(s.precip[i],1)+' mm');
   var start=Math.max(0,i-59),raw=[],smooth=[],tavg=[],precip=[];
   for(var k=start;k<=i;k++){raw.push(s.casesRaw[k]||0);smooth.push(s.casesSmooth[k]||0);tavg.push(s.tavg[k]||0);precip.push(s.precip[k]||0)}
-  $('#drawer-trend').innerHTML=drawerChart(raw,'rgba(156,190,210,.55)','rgba(156,190,210,.06)',null).replace('</svg>','')+'<path d="'+smooth.reduce(function(acc,v,j){var n=smooth.length;var x=2+j/(n-1)*406;var mn=Math.min.apply(null,smooth),mx=Math.max.apply(null,smooth);var y=74-2-(v-mn)/(mx-mn||1)*70;return acc+(j?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)},'')+'" fill="none" stroke="#42d7ff" stroke-width="1.8"/></svg>';
+  $('#drawer-trend').innerHTML=drawerDualChart(raw,smooth);
   $('#drawer-weather-chart').innerHTML=drawerChart(tavg,'#7cebd8','rgba(80,235,210,.10)',precip).replace('</svg>','')+
     '<text x="4" y="10" fill="#5e91ac" font-size="8">气温 °C / 降水柱</text></svg>';
   $('#drawer-metrics').innerHTML=
@@ -450,8 +468,8 @@ function downloadCSV(){
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name+'_2015_2019.csv';a.click();URL.revokeObjectURL(a.href);
 }
 /* ---------- help / fullscreen ---------- */
-function openHelp(){$('#help-mask').classList.add('on');$('#help-modal').classList.add('open');$('#help-modal').setAttribute('aria-hidden','false');try{$('#help-close').focus()}catch(e){}}
-function closeHelp(){$('#help-mask').classList.remove('on');$('#help-modal').classList.remove('open');$('#help-modal').setAttribute('aria-hidden','true')}
+function openHelp(){$('#help-mask').classList.add('on');$('#help-modal').classList.add('open');$('#help-modal').setAttribute('aria-hidden','false');$('#help-modal').inert=false;try{$('#help-close').focus()}catch(e){}}
+function closeHelp(){$('#help-mask').classList.remove('on');$('#help-modal').classList.remove('open');$('#help-modal').setAttribute('aria-hidden','true');$('#help-modal').inert=true}
 function toggleFull(){if(!document.fullscreenElement){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()}else{document.exitFullscreen&&document.exitFullscreen()}}
 /* ---------- boot ---------- */
 function boot(){
@@ -467,7 +485,9 @@ function boot(){
     var q=new URLSearchParams(location.search);
     var max=-Infinity,idx=0;PROV.casesSmoothSum.forEach(function(v,i){if(v>max){max=v;idx=i}});
     state.idx=idx;
-    if(q.get('date')){var qi=DATA.meta.dates.indexOf(q.get('date'));if(qi>=0)state.idx=qi}
+    if(q.get('date')){var qi=DATA.meta.dates.indexOf(q.get('date'));if(qi>=START_IDX)state.idx=qi}
+    state.idx=Math.max(START_IDX,state.idx);
+    $('#slider').min=START_IDX;$('#date-pick').min=DATA.meta.dates[START_IDX];
     if(['cases','precip','tavg'].indexOf(q.get('mode'))>=0)state.mode=q.get('mode');
     if(q.get('horizon'))state.horizon=clamp(parseInt(q.get('horizon'),10)||1,1,12);
     state.city=q.get('city')&&CITY[q.get('city')]?q.get('city'):null;
@@ -476,11 +496,13 @@ function boot(){
     updateMap();drawForecast();drawHorizon();drawRanking();updateAll();
     var h=$('.p-forecast .panel-h h2');if(h)h.textContent='模型预测 · '+CITY[state.city].short;
     if(q.get('city'))openDrawer(state.city);
+    if(['cases','precip','tavg'].indexOf(state.mode)>=0)$$('#map-tabs button').forEach(function(x){x.classList.toggle('on',x.getAttribute('data-mode')===state.mode)});
+    $('#city-drawer').inert=true;$('#help-modal').inert=true;
     $('#loading').classList.add('hide');
     setInterval(function(){var d=new Date();$('#clock').textContent=d.toTimeString().slice(0,8)},1000);
-  }).catch(function(err){console.error(err);var ld=$('#loading');if(ld){ld.innerHTML='<span style="color:#ff8f9e">数据加载失败：'+String(err).slice(0,80)+'</span>'}});
+  }).catch(function(err){console.error(err);var ld=$('#loading');if(ld){ld.innerHTML='<div class="load-error"><b>数据加载失败</b><p>'+String(err).slice(0,100)+'</p><button onclick="location.reload()">重新加载</button><a href="index.html">返回大屏</a></div>'}});
   $('#slider').addEventListener('input',function(){state.idx=+this.value;updateAll()});
-  $('#date-pick').addEventListener('change',function(){var i=DATA.meta.dates.indexOf(this.value);if(i>=0){state.idx=i;updateAll()}});
+  $('#date-pick').addEventListener('change',function(){var i=DATA.meta.dates.indexOf(this.value);if(i>=START_IDX){state.idx=i;updateAll()}});
   $('#play').addEventListener('click',playToggle);
   $('#prev').addEventListener('click',function(){step(-1)});
   $('#next').addEventListener('click',function(){step(1)});
@@ -497,7 +519,8 @@ function boot(){
     var tag=(ev.target&&ev.target.tagName||'').toLowerCase();
     if(tag==='input'||tag==='select'||tag==='textarea')return;
     if(ev.key==='Escape'){closeHelp();closeDrawer();return}
-    if(ev.code==='Space'){ev.preventDefault();playToggle();return}
+    if(ev.key==='Tab'&&trapFocus(ev))return;
+    if(ev.code==='Space'){if(tag==='button'||tag==='a'||ev.target.closest&&ev.target.closest('button,a'))return;ev.preventDefault();playToggle();return}
     if(ev.key==='ArrowLeft'){ev.preventDefault();step(-1)}
     if(ev.key==='ArrowRight'){ev.preventDefault();step(1)}
   });
