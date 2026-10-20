@@ -13,6 +13,7 @@
     <div class="head-left">
       <div class="sys-tag"><i></i> WMEG-Net / 时空预测系统</div>
       <div class="sys-sub">山西省 · 11 个地级市 · 2015—2019</div>
+      <div id="alert-chip" class="alert-chip"><i></i><span>风险计算中</span></div>
     </div>
     <div class="head-title">
       <div class="title-kicker">SPATIOTEMPORAL INFLUENZA FORECASTING</div>
@@ -113,7 +114,7 @@
     <aside class="col col-right">
       <section class="panel p-forecast">
         <div class="panel-h"><span class="ph-ico"></span><h2>模型预测</h2><em>FORECAST · TEST</em></div>
-        <div class="chart-legend"><span class="lg true">真实</span><span class="lg pred">集成预测</span></div>
+        <div class="chart-legend"><span class="lg true">真实</span><span class="lg pred">集成预测</span><span class="lg band">15 种子 P10–P90</span></div>
         <div id="forecast-chart" class="forecast-chart"></div>
         <div class="forecast-metrics">
           <div><span>原始 RMSE</span><b>2.1611</b></div>
@@ -142,7 +143,7 @@
   </main>
 
   <footer class="screen-foot">
-    <span>数据：11 市逐日 ILI 监测计数 · ERA5-Land 气象 · 地面降水 · 行政接壤图</span>
+    <span>数据截止 2019-12-31：11 市逐日 ILI 监测计数 · ERA5-Land 气象 · 地面降水 · 行政接壤图</span>
     <span>口径：7 日平滑序列；RMSE 为 132 个“城市 × 步长”单元等权平均</span>
     <span>WMEG-Net · 15,385 参数 · 15 种子集成</span>
   </footer>

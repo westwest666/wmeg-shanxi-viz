@@ -1,6 +1,6 @@
 'use strict';
 /* CENI-style big screen · data-driven */
-var DATA=null, GEO=null, FIT=null;
+var DATA=null, GEO=null, FIT=null, MECH=null, CITY_Q90={};
 var CITY={}, SERIES={}, PROV={};
 var state={idx:0,mode:'cases',city:null,playing:false,speed:10,timer:null,horizon:1,edges:true,labels:true};
 var MAP=null;
@@ -19,6 +19,15 @@ function colorScale(v,min,max){
   var p=t*(stops.length-1),i=Math.min(stops.length-2,Math.floor(p)),u=p-i;
   var a=stops[i],b=stops[i+1];
   return 'rgb('+Math.round(a[0]+(b[0]-a[0])*u)+','+Math.round(a[1]+(b[1]-a[1])*u)+','+Math.round(a[2]+(b[2]-a[2])*u)+')';
+}
+function colorDomain(){
+  if(state.mode==='cases')return [0,40];
+  if(state.mode==='precip')return [0,20];
+  return [-10,30];
+}
+function quantile(arr,q){
+  var a=arr.filter(function(v){return v!==null&&v!==undefined&&!isNaN(v)}).slice().sort(function(x,y){return x-y});
+  if(!a.length)return 0;var pos=(a.length-1)*q,lo=Math.floor(pos),hi=Math.ceil(pos);return a[lo]+(a[hi]-a[lo])*(pos-lo);
 }
 function cityValue(name,i){
   if(state.mode==='precip') return SERIES[name].precip[i];
@@ -170,7 +179,7 @@ function selectCity(name,open){
 function updateMap(){
   var i=state.idx;
   var vals=DATA.meta.cities.map(function(c){return cityValue(c.name,i)});
-  var min=Math.min.apply(null,vals),max=Math.max.apply(null,vals);
+  var dom=colorDomain();var min=dom[0],max=dom[1];
   var topNames=DATA.meta.cities.map(function(c){return {name:c.name,v:cityValue(c.name,i)}}).sort(function(a,b){return b.v-a.v}).slice(0,3).map(function(d){return d.name});
   $$('#map .city-zone').forEach(function(p){
     var name=p.getAttribute('data-name');var v=cityValue(name,i);
@@ -190,7 +199,8 @@ function updateMap(){
   });
   $('#map-date').textContent=DATA.meta.dates[i];
   var lg=$('#map-legend');
-  lg.innerHTML='<span>'+modeName()+'</span><i class="bar"></i><span>'+fmt(min,1)+' — '+fmt(max,1)+'</span>';
+  var unit=state.mode==='cases'?' 例':(state.mode==='precip'?' mm':' °C');
+  lg.innerHTML='<span>'+modeName()+' · 固定色阶</span><i class="bar"></i><span>'+fmt(min,0)+' — '+fmt(max,0)+unit+'</span>';
 }
 function drawRanking(){
   var i=state.idx;
@@ -207,8 +217,18 @@ function drawRanking(){
   var total=arr.reduce(function(s,d){return s+d.v},0)||1;
   var top3=arr.slice(0,3).reduce(function(s,d){return s+d.v},0);
   var pct=Math.round(top3/total*100);
-  $('#rank-summary').innerHTML='<div class="rank-donut" style="background:conic-gradient(#3fe0d0 0 '+pct+'%,#ffbd5a '+pct+'% '+(pct+15)+'%,#256b88 '+(pct+15)+'% 100%)"><b>'+pct+'%</b></div>'+
+  $('#rank-summary').innerHTML='<div class="rank-donut" style="background:conic-gradient(#3fe0d0 0 '+pct+'%,#1b4b63 '+pct+'% 100%)"><b>'+pct+'%</b></div>'+
     '<div class="rank-sum-txt"><span>TOP 3 SHARE / 集中度</span><b>前 3 城占全省 '+pct+'%<br>'+arr[0].short+'、'+arr[1].short+'、'+arr[2].short+' 为当前高位</b></div>';
+}
+function updateAlert(){
+  if(!DATA)return;
+  var i=state.idx;
+  var risks=DATA.meta.cities.filter(function(c){var v=SERIES[c.name].casesSmooth[i]||0;return v>=CITY_Q90[c.name]}).map(function(c){return {short:c.short,v:SERIES[c.name].casesSmooth[i]||0}}).sort(function(a,b){return b.v-a.v});
+  var chip=$('#alert-chip');if(!chip)return;
+  var level=risks.length>=4?'high':(risks.length>=1?'watch':'low');
+  chip.className='alert-chip '+level;
+  var names=risks.slice(0,3).map(function(x){return x.short}).join(' / ');
+  chip.innerHTML='<i></i><span>风险：'+(level==='high'?'高':level==='watch'?'关注':'低')+(risks.length?' · '+risks.length+' 城高于 P90 · '+names:' · 无城市超 P90')+'</span>';
 }
 function updateMetrics(){
   var i=state.idx;
@@ -224,7 +244,7 @@ function updateMetrics(){
   $('#map-date').textContent=DATA.meta.dates[i];
   $('#tl-date').textContent=DATA.meta.dates[i];
   $('#tl-week').textContent=weekday(DATA.meta.dates[i]);
-  $('#date').textContent=DATA.meta.dates[i];
+  $('#date').textContent='回放 '+DATA.meta.dates[i];
   $('#slider').value=state.idx;
   $('#date-pick').value=DATA.meta.dates[i];
   // weather
@@ -268,11 +288,18 @@ function drawForecast(){
   var name=state.city||'太原市';var s=FIT.series[name]||FIT.province;
   var t=s.true||[],p=s.pred||[];
   var start=Math.max(0,t.length-92);var tt=t.slice(start),pp=p.slice(start);
+  var ci=-1;for(var q=0;q<DATA.meta.cities.length;q++)if(DATA.meta.cities[q].name===name)ci=q;
+  var b10=[],b90=[];
+  if(MECH&&MECH.fan&&ci>=0){for(var d=start;d<t.length;d++){b10.push(MECH.fan.p10[d][ci]);b90.push(MECH.fan.p90[d][ci])}}
+  var all=tt.concat(pp).concat(b10).concat(b90);
   var w=386,h=158,padL=28,padR=8,padT=8,padB=18;
-  var min=Math.min.apply(null,tt.concat(pp)),max=Math.max.apply(null,tt.concat(pp));var span=max-min||1;
+  var min=Math.min.apply(null,all),max=Math.max.apply(null,all);var span=max-min||1;
   function x(i){return padL+i/(tt.length-1)*(w-padL-padR)}
   function y(v){return padT+(max-v)/span*(h-padT-padB)}
   function line(a){return a.map(function(v,i){return (i?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1)}).join('')}
+  function revLine(a){return a.map(function(v,i){return 'L'+x(i).toFixed(1)+' '+y(v).toFixed(1)}).reverse().join('')}
+  var band='';
+  if(b10.length===tt.length){var bd=line(b10)+revLine(b90)+'Z';band='<path d="'+bd+'" fill="rgba(66,215,255,.10)" stroke="rgba(66,215,255,.22)" stroke-width=".7"/>'}
   var grid='';
   for(var g=0;g<4;g++){var yy=padT+g/(3)*(h-padT-padB);grid+='<line x1="'+padL+'" x2="'+(w-padR)+'" y1="'+yy+'" y2="'+yy+'" stroke="rgba(66,215,255,.09)"/>'}
   var labels='<text x="4" y="'+(y(max)+3)+'" fill="#507e99" font-size="8">'+fmt(max,1)+'</text><text x="4" y="'+(y(min)+3)+'" fill="#507e99" font-size="8">'+fmt(min,1)+'</text>';
@@ -280,7 +307,7 @@ function drawForecast(){
   labels+='<text x="'+padL+'" y="'+(h-4)+'" fill="#507e99" font-size="8">'+FIT.testDates[start]+'</text>';
   $('#forecast-chart').innerHTML='<svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'+
     '<defs><linearGradient id="fg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#39e0c5" stop-opacity=".24"/><stop offset="1" stop-color="#39e0c5" stop-opacity="0"/></linearGradient></defs>'+
-    grid+labels+
+    grid+labels+band+
     '<path d="'+line(pp)+'L'+x(pp.length-1)+' '+(h-padB)+'L'+padL+' '+(h-padB)+'Z" fill="url(#fg)"/>'+
     '<path d="'+line(tt)+'" fill="none" stroke="#d9fbff" stroke-width="1.2" stroke-opacity=".7"/>'+
     '<path d="'+line(pp)+'" fill="none" stroke="#39e0c5" stroke-width="1.7"/>'+
@@ -335,7 +362,7 @@ function updateURL(){
   history.replaceState(null,'',location.pathname+'?'+p.toString());
 }
 function updateAll(){
-  updateMap();drawRanking();updateMetrics();drawWeatherSpark();drawForecast();drawError();drawHorizon();
+  updateMap();drawRanking();updateMetrics();updateAlert();drawWeatherSpark();drawForecast();drawError();drawHorizon();
   if($('#city-drawer').classList.contains('open'))drawDrawer();
   updateURL();
 }
@@ -432,10 +459,11 @@ function boot(){
   Promise.all([
     fetch('data/app_data.json').then(function(r){return r.json()}),
     fetch('data/geo.json').then(function(r){return r.json()}),
-    fetch('data/fit_data.json').then(function(r){return r.json()})
+    fetch('data/fit_data.json').then(function(r){return r.json()}),
+    fetch('data/mech_data.json').then(function(r){return r.json()})
   ]).then(function(res){
-    DATA=res[0];GEO=res[1];FIT=res[2];PROV=DATA.meta.province;
-    DATA.meta.cities.forEach(function(c){CITY[c.name]=c;SERIES[c.name]=DATA.series[c.name]});
+    DATA=res[0];GEO=res[1];FIT=res[2];MECH=res[3];PROV=DATA.meta.province;
+    DATA.meta.cities.forEach(function(c){CITY[c.name]=c;SERIES[c.name]=DATA.series[c.name];CITY_Q90[c.name]=quantile(SERIES[c.name].casesSmooth,0.9)});
     var q=new URLSearchParams(location.search);
     var max=-Infinity,idx=0;PROV.casesSmoothSum.forEach(function(v,i){if(v>max){max=v;idx=i}});
     state.idx=idx;

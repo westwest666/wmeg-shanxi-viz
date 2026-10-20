@@ -357,3 +357,22 @@ body{display:block;position:relative}
 .step-btn:hover{color:#fff;border-color:var(--cyan)}
 .timeline{grid-template-columns:clamp(290px,18.6vw,350px) minmax(0,1fr) clamp(100px,6vw,120px)}
 #date-pick{width:102px;min-width:102px;flex-basis:102px}
+/* final completeness: alert, uncertainty legend, readable minimums */
+.alert-chip{display:inline-flex;align-items:center;gap:6px;margin-top:6px;padding:2px 7px;border:1px solid rgba(255,209,102,.28);background:rgba(70,48,12,.28);color:#d8bd84;font-size:9.5px;letter-spacing:.04em;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.alert-chip i{width:6px;height:6px;border-radius:50%;background:#ffd166;box-shadow:0 0 8px rgba(255,209,102,.8);flex:0 0 auto}
+.alert-chip.high{border-color:rgba(255,93,115,.42);background:rgba(80,20,30,.34);color:#ffb0bb}.alert-chip.high i{background:#ff5d73;box-shadow:0 0 8px rgba(255,93,115,.8)}
+.alert-chip.low{border-color:rgba(53,224,200,.3);background:rgba(8,56,56,.25);color:#87e8d8}.alert-chip.low i{background:#35e0c8;box-shadow:0 0 8px rgba(53,224,200,.7)}
+.chart-legend .band:before{background:linear-gradient(90deg,rgba(66,215,255,.15),rgba(66,215,255,.6))}
+.panel-h em{font-size:clamp(9px,.49vw,9.5px)}
+.forecast-metrics span{font-size:clamp(9px,.47vw,9.5px)}
+.rank-head{font-size:clamp(9px,.5vw,9.5px)}
+.brief-foot{font-size:clamp(9px,.48vw,9.5px)}
+.screen-foot{font-size:clamp(9px,.52vw,10px)}
+.horizon-select{font-size:clamp(9.5px,.58vw,10px)}
+.map-legend{font-size:clamp(10px,.55vw,10.5px)}
+.map-status{font-size:clamp(10px,.55vw,10.5px)}
+.panel-note{font-size:clamp(9.5px,.52vw,10px)}
+.weather-k span{font-size:clamp(9.5px,.5vw,10px)}
+.map-title b{font-size:clamp(10px,.58vw,11px)}
+.tl-right{font-size:clamp(9px,.48vw,9.5px)}
+.chart-legend{font-size:clamp(10px,.52vw,10px)}
